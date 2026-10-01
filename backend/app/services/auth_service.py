@@ -2,42 +2,56 @@
 auth_service.py
 ---------------
 Handles password hashing/verification and JWT creation/decoding.
-All secrets come from app.config.settings — never hardcoded here.
+
+Uses bcrypt directly (no passlib) to avoid the passlib 1.7.x / bcrypt 5.x
+incompatibility.  All secrets come from app.config.settings — never hardcoded.
 """
+import secrets as _secrets
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import bcrypt
 import jwt
-from fastapi import Cookie, Depends, HTTPException, Request, status
-from passlib.context import CryptContext
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db.session import get_db
 from app.models.user import User
 
-# ---------------------------------------------------------------------------
-# Password hashing
-# ---------------------------------------------------------------------------
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# ---------------------------------------------------------------------------
+# Password hashing — bcrypt directly (no passlib dependency)
+# ---------------------------------------------------------------------------
 
 def hash_password(plain: str) -> str:
-    return pwd_context.hash(plain)
+    """Return a bcrypt hash of the plaintext password."""
+    password_bytes = plain.encode("utf-8")
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password_bytes, salt).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    """Return True if the plaintext password matches the stored bcrypt hash."""
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------------------
 # JWT helpers
 # ---------------------------------------------------------------------------
+
 def create_access_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    payload = {"sub": subject, "exp": expire, "iat": datetime.now(timezone.utc)}
+    payload = {
+        "sub": subject,
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+    }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
@@ -51,24 +65,27 @@ def decode_access_token(token: str) -> str:
         return sub
     except jwt.ExpiredSignatureError:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has expired"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
         )
     except jwt.InvalidTokenError:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
         )
 
 
 # ---------------------------------------------------------------------------
 # FastAPI dependency — requires authenticated user
 # ---------------------------------------------------------------------------
+
 def get_current_user(
     request: Request,
     db: Session = Depends(get_db),
 ) -> User:
     """
     Reads the JWT from the HttpOnly cookie, verifies it, and returns the User.
-    Raises 401 if missing, expired, or invalid.
+    Raises 401 if the cookie is missing, expired, or invalid.
     """
     token: Optional[str] = request.cookies.get(settings.COOKIE_NAME)
     if not token:
@@ -89,8 +106,6 @@ def get_current_user(
 # ---------------------------------------------------------------------------
 # CSRF helpers
 # ---------------------------------------------------------------------------
-import secrets as _secrets
-
 
 def generate_csrf_token() -> str:
     return _secrets.token_hex(32)
@@ -98,9 +113,14 @@ def generate_csrf_token() -> str:
 
 def verify_csrf_token(request: Request) -> None:
     """
-    For state-changing requests: compare the CSRF token in the request header
-    against the value stored in the csrf_token cookie.
-    Raises 403 if missing or mismatched.
+    For state-changing requests: compare the X-CSRF-Token header value against
+    the csrf_token cookie.  Raises 403 if missing or mismatched.
+
+    Frontend integration:
+      1. After login/signup the frontend reads document.cookie for 'csrf_token'.
+      2. Every POST/PATCH/DELETE request must include:
+             X-CSRF-Token: <token_value>
+         in the request headers.
     """
     cookie_token: Optional[str] = request.cookies.get(settings.CSRF_COOKIE_NAME)
     header_token: Optional[str] = request.headers.get(settings.CSRF_HEADER_NAME)

@@ -16,16 +16,12 @@ Covers
 * Health endpoint
 * DB transaction rollback on failure (simulated via duplicate)
 """
-import time
-from datetime import timedelta
-
 import pytest
-import jwt
+from datetime import timedelta
 
 from app.config import settings
 from app.services.auth_service import create_access_token
 
-pytestmark = pytest.mark.anyio
 
 SIGNUP = {
     "full_name": "Anil Kulkarni",

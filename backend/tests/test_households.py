@@ -13,7 +13,6 @@ import pytest
 
 from app.config import settings
 
-pytestmark = pytest.mark.anyio
 
 USER_A = {
     "full_name": "Anil Kulkarni",
