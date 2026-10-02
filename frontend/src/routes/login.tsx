@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { LogIn } from "lucide-react";
 import { FormEvent, useState } from "react";
-import { loginDemoUser } from "@/lib/auth";
+import { login } from "@/lib/api/auth";
 import { PublicNavbar } from "@/components/PublicNavbar";
 
 export const Route = createFileRoute("/login")({
@@ -18,9 +18,13 @@ function Login() {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
-    const ok = await loginDemoUser(email, password);
-    if (!ok) {
-      setError("No matching demo account was found. Create an account first.");
+    const result = await login(email, password);
+
+    if (!result.success) {
+      setError(
+        result.error ??
+          "No matching account was found. Create an account first.",
+      );
       return;
     }
     navigate({ to: "/dashboard" });

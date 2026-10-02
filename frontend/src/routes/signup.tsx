@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { UserPlus } from "lucide-react";
 import { FormEvent, useState } from "react";
-import { createDemoUser } from "@/lib/auth";
+import { register } from "@/lib/api/auth";
 import { PublicNavbar } from "@/components/PublicNavbar";
 
 export const Route = createFileRoute("/signup")({
@@ -28,7 +28,13 @@ function Signup() {
       setError("Passwords do not match.");
       return;
     }
-    await createDemoUser(name, email, password);
+    const result = await register(name, email, password);
+
+    if (!result.success) {
+      setError(result.error ?? "Unable to create the account.");
+      return;
+    }
+
     navigate({ to: "/dashboard" });
   };
 
