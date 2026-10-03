@@ -2,24 +2,36 @@
 
 Continuum is a household successor-readiness platform. The backend is built with Python 3.12, FastAPI, SQLite, SQLAlchemy 2.x, and Alembic.
 
-## Phase 1, 2, & 3 Completed
+## Completed Phases (1, 2, 3 & 4)
 
 The backend currently supports:
 * **Authentication**: Cookie-based JWT authentication with strictly enforced CSRF protection for all state-changing endpoints (`POST`, `PATCH`, `DELETE`).
 * **Household Management**: Automatic household creation on signup. Strict cross-tenant isolation on all models and physical files.
 * **Domain Models**: Documents, Extracted Fields, Readiness Scores, and Tasks.
 * **Secure Document Upload**: Multipart document uploading with local storage abstraction, file-size limits, and path traversal protection.
-* **Basic Processing Pipeline**: Support for `.txt` extraction via basic deterministic parsing, automatically generating unconfirmed `ExtractedField` records and recording lifecycle statuses.
+* **Deterministic Extraction & Field Confirmation**: Support for `.txt` extraction via basic deterministic parsing, generating unconfirmed `ExtractedField` records. Endpoints for listing, editing, confirming, and rejecting extracted fields.
+* **Deterministic Readiness Scoring Engine**: Transparent, formula-driven calculation across 7 household dimensions based strictly on confirmed fields, providing human-readable explanations and automatic score updates upon field confirm/reject or document upload/delete.
+* **Frontend Integration**: Connected React 19 frontend interfaces to FastAPI endpoints with credentialed requests and CSRF tokens.
 
-### Data Models & Relationships
+---
 
-- **User**: Represents a registered user.
-- **Household**: The primary tenant boundary. Owned by a `User`.
-- **HouseholdMember**: Members of a household.
-- **Document**: Represents an uploaded document. Tracks `upload_status` and `storage_reference`.
-- **ExtractedField**: Represents data extracted from a document. Belongs to a `Document`.
-- **ReadinessScore**: Tracks readiness progress across dimensions. Belongs to a `Household`.
-- **Task**: Tracks actionable items (Day-Zero tasks). Belongs to a `Household`.
+### Seven Readiness Dimensions & Scoring Formula
+
+1. **Asset Discovery (`asset`)** — Weight: `1.0` (Base: 20.0)
+2. **Beneficiary Completeness (`beneficiary`)** — Weight: `1.5` (Base: 15.0)
+3. **Deadline Awareness (`deadline`)** — Weight: `1.0` (Base: 20.0)
+4. **Liability Awareness (`liability`)** — Weight: `1.0` (Base: 20.0)
+5. **Document Accessibility (`access`)** — Weight: `1.25` (Base: 15.0)
+6. **Successor Knowledge (`successor`)** — Weight: `1.5` (Base: 15.0)
+7. **Emergency Contacts (`contacts`)** — Weight: `1.0` (Base: 20.0)
+
+**Calculation Rules:**
+* Each confirmed field (`confirmation_status == "CONFIRMED"`) in a dimension adds 20.0 points.
+* Dimension score = `min(100.0, base_score + (confirmed_count * 20.0))`.
+* Overall score = `round( sum(dimension_score * weight) / sum(weight) )`.
+* Unconfirmed (`UNCONFIRMED`) and rejected (`REJECTED`) fields do not add points to readiness scores until verified by a human.
+
+---
 
 ### Local Run Commands
 
@@ -51,6 +63,8 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
+---
+
 ### Test Commands
 Run the complete test suite (includes in-memory SQLite isolation per test):
 
@@ -64,10 +78,12 @@ Run the complete test suite (includes in-memory SQLite isolation per test):
 pytest tests/ -v
 ```
 
+---
+
 ### API Endpoints
 
 All endpoints are prefixed with `/api/v1`.
-Cookie-based authentication is required (except `/auth/signup` and `/auth/login`).
+Cookie-based authentication is required for protected routes.
 All `POST`, `PATCH`, and `DELETE` endpoints strictly require the `X-CSRF-Token` header.
 
 #### Auth & Households
@@ -79,18 +95,23 @@ All `POST`, `PATCH`, and `DELETE` endpoints strictly require the `X-CSRF-Token` 
 
 #### Documents
 * `GET /documents` - List all household documents
-* `POST /documents/upload` - Upload a document (`multipart/form-data`) and trigger processing
+* `POST /documents/upload` - Upload a document (`multipart/form-data`) and trigger processing & score calculation
 * `GET /documents/{id}` - Get document metadata and extracted fields
+* `GET /documents/{id}/fields` - List extracted fields for a specific document
 * `GET /documents/{id}/download` - Download the physical document file securely
 * `PATCH /documents/{id}` - Update document metadata
-* `DELETE /documents/{id}` - Delete a document and its stored physical file
+* `DELETE /documents/{id}` - Delete a document and its stored physical file (triggers score recalculation)
 
-#### Extracted Fields
+#### Extracted Fields & Confirmation
 * `GET /fields/{id}` - Get field details
-* `PATCH /fields/{id}` - Update extracted field value or confirmation status
+* `PATCH /fields/{id}` - Update extracted field value or confirmation status (`UNCONFIRMED`, `CONFIRMED`, `REJECTED`)
+* `POST /fields/{id}/confirm` - Confirm field (optional `{ "extracted_value": "..." }` body)
+* `POST /fields/{id}/reject` - Reject field
 
 #### Readiness Scores
-* `GET /scores` - List all score dimensions for the household
+* `GET /scores` - Retrieve overall score, dimension breakdowns, and human-readable missing data explanations
+* `GET /scores/raw` - Raw list of readiness score records
+* `POST /scores/recalculate` - Force score recalculation
 
 #### Tasks
 * `GET /tasks` - List all household tasks
@@ -99,15 +120,9 @@ All `POST`, `PATCH`, and `DELETE` endpoints strictly require the `X-CSRF-Token` 
 * `PATCH /tasks/{id}` - Update task details
 * `DELETE /tasks/{id}` - Delete a task
 
-### Storage & Security Information
-* **Local Storage Directory**: Files are stored securely in `./storage` (configurable via `STORAGE_DIR`).
-* **Upload Limits**: Maximum file upload size is set to 5 MB (`MAX_UPLOAD_SIZE`). Empty files are rejected.
-* **File Naming**: To prevent path traversal attacks, physical files are named using random UUIDs rather than user-provided filenames. The original filename is stored strictly as metadata.
-* **Supported Extraction Formats**: Only `text/plain` files are parsed for extraction. All other formats are securely stored but skip extraction, transitioning immediately to a `COMPLETED` upload status.
-* **Processing Lifecycle**: Documents transition from `UPLOADED` -> `PROCESSING` -> `COMPLETED` (or `FAILED`).
+---
 
 ### Current Limitations
-* Document file upload leverages local filesystem storage, meaning it is not yet scalable (to be adapted to S3/Azure Blob).
-* ML-based OCR extraction and parsing is mocked and not yet implemented (Phase 4 scope).
-* Readiness scoring algorithms are not yet integrated into the backend.
-* Guardian Vault and Shamir Secret Sharing is strictly a frontend prototype right now.
+* Document file upload leverages local filesystem storage (`./storage`).
+* Extraction is strictly deterministic text parsing (`Key: Value`) for `.txt` files.
+* ML/OCR intelligent understanding, Celery background queues, and AWS S3 storage adapters belong to future phases.

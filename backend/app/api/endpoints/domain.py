@@ -1,20 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.db.session import get_db
 from app.models.household import Household
 from app.api.deps import get_current_household, verify_csrf
 from app.schemas.domain import (
     DocumentOut, DocumentCreate, DocumentUpdate,
-    ExtractedFieldOut, ExtractedFieldUpdate,
-    ReadinessScoreOut,
+    ExtractedFieldOut, ExtractedFieldUpdate, FieldConfirmRequest,
+    ReadinessScoreOut, ReadinessResponse,
     TaskOut, TaskCreate, TaskUpdate
 )
 from app.services.domain_service import DocumentService, FieldService, ScoreService, TaskService
 from app.services.storage_service import StorageService
 from app.services.extraction_service import ExtractionService
+from app.services.readiness_service import ReadinessService
 from app.models.domain import Document
 
 docs_router = APIRouter(prefix="/documents", tags=["documents"])
@@ -79,6 +80,13 @@ def get_document(doc_id: str, db: Session = Depends(get_db), hh: Household = Dep
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
 
+@docs_router.get("/{doc_id}/fields", response_model=List[ExtractedFieldOut])
+def get_document_fields(doc_id: str, db: Session = Depends(get_db), hh: Household = Depends(get_current_household)):
+    doc = DocumentService.get_document(db, doc_id, hh.id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return FieldService.get_fields_for_document(db, doc_id)
+
 @docs_router.get("/{doc_id}/download")
 def download_document(doc_id: str, db: Session = Depends(get_db), hh: Household = Depends(get_current_household)):
     doc = DocumentService.get_document(db, doc_id, hh.id)
@@ -108,28 +116,64 @@ def delete_document(doc_id: str, db: Session = Depends(get_db), hh: Household = 
     if doc.storage_reference:
         StorageService.delete_file(doc.storage_reference)
         
-    db.delete(doc)
-    db.commit()
+    DocumentService.delete_document(db, doc)
 
 # -- Fields --
 @fields_router.get("/{field_id}", response_model=ExtractedFieldOut)
 def get_field(field_id: str, db: Session = Depends(get_db), hh: Household = Depends(get_current_household)):
     field = FieldService.get_field(db, field_id)
-    if not field or field.document.household_id != hh.id:
+    if not field or not field.document or field.document.household_id != hh.id:
         raise HTTPException(status_code=404, detail="Field not found")
     return field
 
 @fields_router.patch("/{field_id}", response_model=ExtractedFieldOut, dependencies=[Depends(verify_csrf)])
 def update_field(field_id: str, field_in: ExtractedFieldUpdate, db: Session = Depends(get_db), hh: Household = Depends(get_current_household)):
     field = FieldService.get_field(db, field_id)
-    if not field or field.document.household_id != hh.id:
+    if not field or not field.document or field.document.household_id != hh.id:
         raise HTTPException(status_code=404, detail="Field not found")
+    
+    if field_in.confirmation_status and field_in.confirmation_status not in ["UNCONFIRMED", "CONFIRMED", "REJECTED"]:
+        raise HTTPException(status_code=400, detail="Invalid confirmation_status value")
+
     return FieldService.update_field(db, field, field_in)
 
+@fields_router.post("/{field_id}/confirm", response_model=ExtractedFieldOut, dependencies=[Depends(verify_csrf)])
+def confirm_field(
+    field_id: str, 
+    body: Optional[FieldConfirmRequest] = None, 
+    db: Session = Depends(get_db), 
+    hh: Household = Depends(get_current_household)
+):
+    field = FieldService.get_field(db, field_id)
+    if not field or not field.document or field.document.household_id != hh.id:
+        raise HTTPException(status_code=404, detail="Field not found")
+    
+    new_value = body.extracted_value if body else None
+    return FieldService.confirm_field(db, field, new_value)
+
+@fields_router.post("/{field_id}/reject", response_model=ExtractedFieldOut, dependencies=[Depends(verify_csrf)])
+def reject_field(
+    field_id: str, 
+    db: Session = Depends(get_db), 
+    hh: Household = Depends(get_current_household)
+):
+    field = FieldService.get_field(db, field_id)
+    if not field or not field.document or field.document.household_id != hh.id:
+        raise HTTPException(status_code=404, detail="Field not found")
+    return FieldService.reject_field(db, field)
+
 # -- Scores --
-@scores_router.get("", response_model=List[ReadinessScoreOut])
-def list_scores(db: Session = Depends(get_db), hh: Household = Depends(get_current_household)):
+@scores_router.get("", response_model=ReadinessResponse)
+def get_readiness_scores(db: Session = Depends(get_db), hh: Household = Depends(get_current_household)):
+    return ReadinessService.get_household_scores(db, hh.id)
+
+@scores_router.get("/raw", response_model=List[ReadinessScoreOut])
+def list_raw_scores(db: Session = Depends(get_db), hh: Household = Depends(get_current_household)):
     return ScoreService.get_scores(db, hh.id)
+
+@scores_router.post("/recalculate", response_model=ReadinessResponse, dependencies=[Depends(verify_csrf)])
+def recalculate_scores(db: Session = Depends(get_db), hh: Household = Depends(get_current_household)):
+    return ReadinessService.calculate_and_save_scores(db, hh.id)
 
 # -- Tasks --
 @tasks_router.get("", response_model=List[TaskOut])

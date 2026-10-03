@@ -16,6 +16,9 @@ class ExtractedFieldUpdate(BaseModel):
     extracted_value: Optional[str] = None
     confirmation_status: Optional[str] = None
 
+class FieldConfirmRequest(BaseModel):
+    extracted_value: Optional[str] = None
+
 class ExtractedFieldOut(ExtractedFieldBase):
     id: str
     document_id: str
@@ -55,6 +58,22 @@ class ReadinessScoreOut(ReadinessScoreBase):
     household_id: str
     calculation_timestamp: datetime
     model_config = {"from_attributes": True}
+
+class DimensionBreakdown(BaseModel):
+    dimension: str
+    label: str
+    score: float
+    weight: float
+    base: float
+    confirmed_count: int
+    unconfirmed_count: int
+    rejected_count: int
+    explanations: List[str]
+
+class ReadinessResponse(BaseModel):
+    overall_score: float
+    dimensions: List[DimensionBreakdown]
+    last_calculated: datetime
 
 class TaskBase(BaseModel):
     title: str

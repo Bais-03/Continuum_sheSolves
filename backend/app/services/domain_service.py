@@ -1,7 +1,9 @@
 from typing import List, Optional
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from app.models.domain import Document, ExtractedField, ReadinessScore, Task
 from app.schemas.domain import DocumentCreate, DocumentUpdate, ExtractedFieldCreate, ExtractedFieldUpdate, TaskCreate, TaskUpdate
+from app.services.readiness_service import ReadinessService
 
 class DocumentService:
     @staticmethod
@@ -29,6 +31,14 @@ class DocumentService:
         db.refresh(doc)
         return doc
 
+    @staticmethod
+    def delete_document(db: Session, doc: Document):
+        household_id = doc.household_id
+        db.delete(doc)
+        db.commit()
+        # Recalculate scores after document deletion
+        ReadinessService.calculate_and_save_scores(db, household_id)
+
 class FieldService:
     @staticmethod
     def get_fields_for_document(db: Session, doc_id: str) -> List[ExtractedField]:
@@ -41,10 +51,43 @@ class FieldService:
     @staticmethod
     def update_field(db: Session, field: ExtractedField, field_in: ExtractedFieldUpdate) -> ExtractedField:
         update_data = field_in.model_dump(exclude_unset=True)
+        status_changed = "confirmation_status" in update_data or "extracted_value" in update_data
+        
         for k, v in update_data.items():
             setattr(field, k, v)
+        field.updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(field)
+
+        if status_changed and field.document:
+            ReadinessService.calculate_and_save_scores(db, field.document.household_id)
+
+        return field
+
+    @staticmethod
+    def confirm_field(db: Session, field: ExtractedField, new_value: Optional[str] = None) -> ExtractedField:
+        field.confirmation_status = "CONFIRMED"
+        if new_value is not None:
+            field.extracted_value = new_value
+        field.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(field)
+
+        if field.document:
+            ReadinessService.calculate_and_save_scores(db, field.document.household_id)
+
+        return field
+
+    @staticmethod
+    def reject_field(db: Session, field: ExtractedField) -> ExtractedField:
+        field.confirmation_status = "REJECTED"
+        field.updated_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(field)
+
+        if field.document:
+            ReadinessService.calculate_and_save_scores(db, field.document.household_id)
+
         return field
 
 class ScoreService:

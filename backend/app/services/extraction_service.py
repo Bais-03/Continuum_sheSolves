@@ -2,6 +2,7 @@ import os
 from sqlalchemy.orm import Session
 from app.models.domain import Document, ExtractedField
 from app.services.storage_service import StorageService
+from app.services.readiness_service import ReadinessService, classify_dimension
 
 class ExtractionService:
     SUPPORTED_MIME_TYPES = ["text/plain"]
@@ -22,6 +23,7 @@ class ExtractionService:
             # Unsupported formats skip extraction but mark as completed for storage
             document.upload_status = "COMPLETED"
             db.commit()
+            ReadinessService.calculate_and_save_scores(db, document.household_id)
             return
             
         try:
@@ -33,7 +35,7 @@ class ExtractionService:
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
             
-            # Very basic deterministic extraction: Key: Value pairs per line
+            # Deterministic extraction: Key: Value pairs per line
             lines = content.splitlines()
             for line in lines:
                 if ":" in line:
@@ -42,17 +44,22 @@ class ExtractionService:
                     value = parts[1].strip()
                     
                     if label and value:
+                        dim_key = classify_dimension(label)
                         field = ExtractedField(
                             document_id=document.id,
                             field_label=label[:100],
                             extracted_value=value,
                             confidence=1.0,
+                            readiness_dimension=dim_key,
                             confirmation_status="UNCONFIRMED"
                         )
                         db.add(field)
             
             document.upload_status = "COMPLETED"
             db.commit()
+            
+            # Trigger score recalculation
+            ReadinessService.calculate_and_save_scores(db, document.household_id)
             
         except Exception:
             document.upload_status = "FAILED"

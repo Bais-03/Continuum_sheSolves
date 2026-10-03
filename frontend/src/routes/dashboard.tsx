@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { computeScores, useStore } from "@/lib/store";
+import { useEffect, useState } from "react";
+import { apiGetScores, apiRecalculateScores } from "@/lib/api";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
@@ -19,9 +20,58 @@ export const Route = createFileRoute("/dashboard")({
   component: Dashboard,
 });
 
+type DimensionItem = {
+  dimension: string;
+  label: string;
+  score: number;
+  weight: number;
+  base: number;
+  confirmed_count: int;
+  unconfirmed_count: int;
+  rejected_count: int;
+  explanations: string[];
+};
+
 function Dashboard() {
-  const s = useStore();
-  const { dims, overall } = computeScores(s);
+  const [overall, setOverall] = useState<number>(17);
+  const [dims, setDims] = useState<DimensionItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [recalculating, setRecalculating] = useState<boolean>(false);
+
+  const fetchScores = async () => {
+    try {
+      setLoading(true);
+      const res = await apiGetScores();
+      if (res) {
+        setOverall(res.overall_score);
+        setDims(res.dimensions || []);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch backend scores:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRecalculate = async () => {
+    try {
+      setRecalculating(true);
+      const res = await apiRecalculateScores();
+      if (res) {
+        setOverall(res.overall_score);
+        setDims(res.dimensions || []);
+      }
+    } catch (err) {
+      console.error("Failed to recalculate scores:", err);
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchScores();
+  }, []);
+
   const gaps = [...dims].filter((d) => d.score < 60).sort((a, b) => a.score - b.score);
   const C = 2 * Math.PI * 70;
 
@@ -29,7 +79,7 @@ function Dashboard() {
     <div className="space-y-10">
       <section className="grid gap-8 md:grid-cols-[1fr_auto] md:items-end">
         <div>
-          <p className="eyebrow">Demo household · the Kulkarnis</p>
+          <p className="eyebrow">Household Readiness · Backend Connected</p>
           <h1 className="mt-2 text-4xl md:text-5xl">
             If Anil were unavailable tomorrow, could Meera carry on?
           </h1>
@@ -71,19 +121,36 @@ function Dashboard() {
       <section className="card-surface p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xl">Seven dimensions</h2>
-          <span className="eyebrow">gold = below 60</span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRecalculate}
+              disabled={recalculating}
+              className="text-xs rounded border px-2.5 py-1 text-muted-foreground hover:bg-muted disabled:opacity-50"
+            >
+              {recalculating ? "Recalculating..." : "Recalculate"}
+            </button>
+            <span className="eyebrow">gold = below 60</span>
+          </div>
         </div>
-        <div className="mt-5 space-y-3">
+        <div className="mt-5 space-y-4">
+          {loading && <p className="text-sm text-muted-foreground">Loading readiness scores...</p>}
           {dims.map((d) => (
-            <div key={d.key} className="grid grid-cols-[180px_1fr_40px] items-center gap-4 text-sm">
-              <span>{d.label}</span>
-              <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-                <div
-                  className={`h-full rounded-full transition-all duration-700 ${d.score < 60 ? "bg-gold" : "bg-primary"}`}
-                  style={{ width: `${d.score}%` }}
-                />
+            <div key={d.dimension} className="space-y-1">
+              <div className="grid grid-cols-[180px_1fr_40px] items-center gap-4 text-sm">
+                <span className="font-medium">{d.label}</span>
+                <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${d.score < 60 ? "bg-gold" : "bg-primary"}`}
+                    style={{ width: `${d.score}%` }}
+                  />
+                </div>
+                <span className="text-right font-mono">{d.score}</span>
               </div>
-              <span className="text-right font-mono">{d.score}</span>
+              {d.explanations && d.explanations.length > 0 && (
+                <div className="pl-[180px] text-xs text-muted-foreground">
+                  {d.explanations.join(" · ")}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -97,9 +164,12 @@ function Dashboard() {
           ) : (
             <ul className="mt-3 space-y-2 text-sm">
               {gaps.map((g) => (
-                <li key={g.key} className="flex justify-between border-b pb-2">
-                  <span>{g.label}</span>
-                  <span className="font-mono text-gold-foreground">{g.score}</span>
+                <li key={g.dimension} className="flex justify-between border-b pb-2">
+                  <div>
+                    <span className="font-medium">{g.label}</span>
+                    <p className="text-xs text-muted-foreground">{g.unconfirmed_count} pending confirmation</p>
+                  </div>
+                  <span className="font-mono text-gold-foreground font-semibold">{g.score}</span>
                 </li>
               ))}
             </ul>
@@ -110,14 +180,14 @@ function Dashboard() {
             <h2 className="text-xl">Raise the score</h2>
             <p className="mt-2 text-sm opacity-80">
               Add household documents and confirm what was extracted. Each confirmed fact closes a
-              gap.
+              gap and automatically updates your readiness score.
             </p>
           </div>
           <Link
             to="/upload"
-            className="self-start rounded-md bg-gold px-4 py-2 text-sm font-medium text-gold-foreground"
+            className="self-start rounded-md bg-gold px-4 py-2 text-sm font-medium text-gold-foreground hover:opacity-90"
           >
-            Upload documents →
+            Upload & Confirm Documents →
           </Link>
         </div>
       </section>

@@ -56,7 +56,14 @@ async def test_scores_list(signed_up_client):
     
     r = await client.get("/api/v1/scores")
     assert r.status_code == 200
-    assert isinstance(r.json(), list)
+    data = r.json()
+    assert "overall_score" in data
+    assert "dimensions" in data
+    assert isinstance(data["dimensions"], list)
+
+    r_raw = await client.get("/api/v1/scores/raw")
+    assert r_raw.status_code == 200
+    assert isinstance(r_raw.json(), list)
 
 async def test_csrf_protection_missing_header(signed_up_client):
     client, user_data = signed_up_client
