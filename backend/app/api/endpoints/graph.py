@@ -20,6 +20,7 @@ from app.schemas.graph import (
     GraphGapOut,
 )
 from app.services.graph_service import GraphService
+from app.services.domain_service import TaskService
 from sqlalchemy.orm import Session
 
 
@@ -49,6 +50,12 @@ def analyze_graph(
         result = service.analyze_fields(fields)
     else:
         result = service.analyze_household(db, household)
+
+    persisted_tasks = TaskService.sync_dayzero_tasks(
+        db=db,
+        household_id=household.id,
+        actions=result.actions,
+    )
 
     entities = [
         GraphEntityOut(
@@ -87,8 +94,10 @@ def analyze_graph(
             priority=action.priority,
             gap_type=action.gap_type,
             entity_id=action.entity_id,
+            task_id=task.id,
+            status=task.status,
         )
-        for action in result.actions
+        for action, task in zip(result.actions, persisted_tasks)
     ]
 
     return GraphAnalysisResponse(

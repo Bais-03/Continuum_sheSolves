@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { actions, useStore } from "@/lib/store";
 import {
   apiAnalyzeGraph,
+  apiUpdateTask,
   type GraphAnalysis,
   type DayZeroAction,
 } from "@/lib/api";
@@ -84,16 +84,13 @@ function dayWindow(action: DayZeroAction): string {
   }
 }
 
-function actionId(action: DayZeroAction): string {
-  return `dayzero-${action.gap_type}-${action.entity_id}`;
-}
 
 /* ============================================================
    COMPONENT
    ============================================================ */
 
 function Playbook() {
-  const store = useStore();
+  
 
   const [analysis, setAnalysis] = useState<GraphAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -140,13 +137,13 @@ function Playbook() {
       )
       .map((action) => ({
         ...action,
-        id: actionId(action),
+        id: action.task_id,
         day: dayWindow(action),
       }));
   }, [analysis]);
 
-  const done = tasks.filter((task) =>
-    store.completedTasks.includes(task.id),
+  const done = tasks.filter(
+    (task) => task.status.toUpperCase() === "DONE",
   ).length;
 
   const remaining = tasks.length - done;
@@ -255,6 +252,49 @@ function Playbook() {
     );
   }
 
+  const handleTaskToggle = async (
+      taskId: string,
+      currentStatus: string,
+    ) => {
+      const nextStatus =
+        currentStatus.toUpperCase() === "DONE"
+          ? "TODO"
+          : "DONE";
+
+      try {
+        setError("");
+
+        const updatedTask = await apiUpdateTask(
+          taskId,
+          nextStatus,
+        );
+
+        setAnalysis((current) => {
+          if (!current) {
+            return current;
+          }
+
+          return {
+            ...current,
+            actions: current.actions.map((action) =>
+              action.task_id === taskId
+                ? {
+                    ...action,
+                    status: updatedTask.status,
+                  }
+                : action,
+            ),
+          };
+        });
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to update Day-Zero task.",
+        );
+      }
+    };
+
   /* ----------------------------------------------------------
      MAIN PLAYBOOK
      ---------------------------------------------------------- */
@@ -351,7 +391,7 @@ function Playbook() {
 
       <ol className="space-y-3">
         {tasks.map((task) => {
-          const checked = store.completedTasks.includes(task.id);
+          const checked = task.status.toUpperCase() === "DONE";
 
           return (
             <li
@@ -365,7 +405,7 @@ function Playbook() {
               <input
                 type="checkbox"
                 checked={checked}
-                onChange={() => actions.toggleTask(task.id)}
+                onChange={() => handleTaskToggle(task.task_id, task.status)}
                 className="mt-1 h-4 w-4 accent-[var(--color-primary)]"
                 aria-label={`Mark ${task.title} as complete`}
               />

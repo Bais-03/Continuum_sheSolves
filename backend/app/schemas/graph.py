@@ -53,13 +53,15 @@ class GraphGapOut(BaseModel):
 
 
 class DayZeroActionOut(BaseModel):
-    """Action generated from a readiness gap."""
-
     title: str
     description: str
     priority: str
     gap_type: str
     entity_id: str
+
+    # Persisted Task information
+    task_id: str
+    status: str
 
 
 class GraphAnalysisResponse(BaseModel):

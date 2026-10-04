@@ -90,6 +90,9 @@ export type DayZeroAction = {
   priority: string;
   gap_type: string;
   entity_id: string;
+
+  task_id: string;
+  status: string;
 };
 
 export type GraphAnalysis = {
@@ -155,4 +158,38 @@ export async function apiGetScores() {
 
 export async function apiRecalculateScores() {
   return apiRequest("/scores/recalculate", { method: "POST" });
+}
+
+// ------------------------------------------------------------
+// Day-Zero / Task APIs
+// ------------------------------------------------------------
+
+export type Task = {
+  id: string;
+  household_id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+  priority: string;
+  status: string;
+  due_date: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function apiGetTasks(): Promise<Task[]> {
+  return apiRequest("/tasks");
+}
+
+export async function apiUpdateTask(
+  taskId: string,
+  status: string,
+): Promise<Task> {
+  return apiRequest(`/tasks/${taskId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ status }),
+  });
 }

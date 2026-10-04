@@ -111,6 +111,66 @@ class TaskService:
         db.commit()
         db.refresh(task)
         return task
+
+    @staticmethod
+    def sync_dayzero_tasks(
+        db: Session,
+        household_id: str,
+        actions: list,
+    ) -> list[Task]:
+        """
+        Create or update persisted Day-Zero tasks generated from
+        the current household knowledge gaps.
+
+        Existing task status is preserved so completing a task
+        survives graph refreshes and page reloads.
+        """
+
+        persisted_tasks: list[Task] = []
+
+        for action in actions:
+            # Stable identity for a generated Day-Zero task.
+            #
+            # Example:
+            # dayzero:beneficiary:<entity_id>
+            task_key = f"dayzero:{action.gap_type}:{action.entity_id}"
+
+            existing_task = (
+                db.query(Task)
+                .filter(
+                    Task.household_id == household_id,
+                    Task.category == task_key,
+                )
+                .first()
+            )
+
+            if existing_task:
+                # Keep the user's existing TODO/DONE status.
+                existing_task.title = action.title
+                existing_task.description = action.description
+                existing_task.priority = action.priority.upper()
+
+                persisted_tasks.append(existing_task)
+                continue
+
+            task = Task(
+                household_id=household_id,
+                title=action.title,
+                description=action.description,
+                category=task_key,
+                priority=action.priority.upper(),
+                status="TODO",
+            )
+
+            db.add(task)
+            persisted_tasks.append(task)
+
+        db.commit()
+
+        for task in persisted_tasks:
+            db.refresh(task)
+
+        return persisted_tasks
         
     @staticmethod
     def update_task(db: Session, task: Task, task_in: TaskUpdate) -> Task:
