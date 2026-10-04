@@ -81,7 +81,7 @@ function Dashboard() {
         <div>
           <p className="eyebrow">Household Readiness · Backend Connected</p>
           <h1 className="mt-2 text-4xl md:text-5xl">
-            If Anil were unavailable tomorrow, could Meera carry on?
+            If you were unavailable tomorrow, would your successor be ready?
           </h1>
           <p className="mt-3 max-w-xl text-muted-foreground">
             Continuum measures readiness, not storage — what a successor would need to know, and

@@ -33,6 +33,12 @@ class GraphFieldNormalizer:
 
     The input format intentionally mirrors the existing ExtractedField
     contract without coupling this module to SQLAlchemy.
+
+    Important design rule:
+    Fields are processed in document order so that beneficiary/contact
+    information is attached to the most recently identified relevant
+    asset/owner instead of being incorrectly attached to the last
+    asset in the entire household.
     """
 
     CONFIRMED = "CONFIRMED"
@@ -49,216 +55,422 @@ class GraphFieldNormalizer:
         entities: dict[str, GraphEntity] = {}
         relationships: list[GraphRelationship] = []
 
+        # Current household owner.
         owner: GraphEntity | None = None
-        asset: GraphEntity | None = None
-        beneficiary: GraphEntity | None = None
-        liability: GraphEntity | None = None
-        contact: GraphEntity | None = None
+
+        # Current asset context.
+        #
+        # This is intentionally updated whenever a new asset is found.
+        # A following beneficiary/nominee is therefore attached to
+        # that specific asset.
+        current_asset: GraphEntity | None = None
+
+        # Current liability context.
+        current_liability: GraphEntity | None = None
+
+        # Current emergency contact.
+        current_contact: GraphEntity | None = None
 
         for field in fields:
+            # ---------------------------------------------------------
             # Only confirmed facts are trusted by the graph.
+            # ---------------------------------------------------------
             if field.get("confirmation_status") != self.CONFIRMED:
                 continue
 
-            label = str(field.get("field_label", "")).strip()
-            value = str(field.get("extracted_value", "")).strip()
+            label = str(
+                field.get("field_label", "")
+            ).strip()
+
+            value = str(
+                field.get("extracted_value", "")
+            ).strip()
 
             if not label or not value:
                 continue
 
-            normalized_label = label.lower()
+            normalized_label = label.lower().strip()
 
-            # -------------------------
+            # ---------------------------------------------------------
             # PERSON / OWNER
-            # -------------------------
+            # ---------------------------------------------------------
             if self._is_owner_field(normalized_label):
                 owner = GraphEntity(
                     id=self._make_id("person", value),
                     entity_type=EntityType.PERSON,
                     name=value,
                 )
+
                 entities[owner.id] = owner
 
-            # -------------------------
+                # If a liability/contact was already discovered before
+                # the owner field, connect them now.
+                if current_liability is not None:
+                    self._add_relationship(
+                        relationships,
+                        owner,
+                        RelationshipType.BORROWS,
+                        current_liability,
+                    )
+
+                if current_contact is not None:
+                    self._add_relationship(
+                        relationships,
+                        owner,
+                        RelationshipType.HAS_CONTACT,
+                        current_contact,
+                    )
+
+            # ---------------------------------------------------------
             # ASSET
-            # -------------------------
+            # ---------------------------------------------------------
             elif self._is_asset_field(normalized_label):
-                asset = GraphEntity(
+                current_asset = GraphEntity(
                     id=self._make_id("asset", value),
                     entity_type=EntityType.ASSET,
                     name=value,
                 )
-                entities[asset.id] = asset
 
-            # -------------------------
+                entities[current_asset.id] = current_asset
+
+                # Owner -> Asset
+                if owner is not None:
+                    self._add_relationship(
+                        relationships,
+                        owner,
+                        RelationshipType.OWNS,
+                        current_asset,
+                    )
+
+            # ---------------------------------------------------------
             # BENEFICIARY / NOMINEE
             #
             # IMPORTANT:
             # "Nominee Relationship" and
-            # "Beneficiary Relationship" are
-            # metadata, NOT graph entities.
-            # -------------------------
+            # "Beneficiary Relationship" are metadata,
+            # NOT graph entities.
+            #
+            # The beneficiary is attached immediately to the
+            # CURRENT asset. This prevents:
+            #
+            # Property -> Beneficiary
+            #
+            # when the beneficiary actually belongs to an insurance
+            # policy or bank account appearing earlier.
+            # ---------------------------------------------------------
             elif self._is_beneficiary_field(normalized_label):
                 beneficiary = GraphEntity(
                     id=self._make_id("person", value),
                     entity_type=EntityType.PERSON,
                     name=value,
                 )
+
                 entities[beneficiary.id] = beneficiary
 
-            # -------------------------
+                if current_asset is not None:
+                    self._add_relationship(
+                        relationships,
+                        current_asset,
+                        RelationshipType.HAS_BENEFICIARY,
+                        beneficiary,
+                    )
+
+            # ---------------------------------------------------------
             # LIABILITY
-            # -------------------------
+            # ---------------------------------------------------------
             elif self._is_liability_field(normalized_label):
-                liability = GraphEntity(
+                current_liability = GraphEntity(
                     id=self._make_id("liability", value),
                     entity_type=EntityType.LIABILITY,
                     name=value,
                 )
-                entities[liability.id] = liability
 
-            # -------------------------
+                entities[current_liability.id] = current_liability
+
+                # Owner -> Liability
+                if owner is not None:
+                    self._add_relationship(
+                        relationships,
+                        owner,
+                        RelationshipType.BORROWS,
+                        current_liability,
+                    )
+
+            # ---------------------------------------------------------
             # EMERGENCY CONTACT
             #
-            # IMPORTANT:
-            # "Emergency Contact Relationship"
-            # is metadata, NOT a separate entity.
-            # -------------------------
+            # "Emergency Contact Relationship" is metadata,
+            # NOT a separate entity.
+            # ---------------------------------------------------------
             elif self._is_contact_field(normalized_label):
-                contact = GraphEntity(
+                current_contact = GraphEntity(
                     id=self._make_id("contact", value),
                     entity_type=EntityType.CONTACT,
                     name=value,
                 )
-                entities[contact.id] = contact
 
-        # Create relationships only when BOTH sides are explicitly
-        # available from confirmed fields.
+                entities[current_contact.id] = current_contact
 
-        # Owner -> Asset
-        if owner is not None and asset is not None:
-            relationships.append(
-                (
-                    owner,
-                    RelationshipType.OWNS,
-                    asset,
-                )
-            )
-
-        # Asset -> Beneficiary
-        if asset is not None and beneficiary is not None:
-            relationships.append(
-                (
-                    asset,
-                    RelationshipType.HAS_BENEFICIARY,
-                    beneficiary,
-                )
-            )
-
-        # Owner -> Liability
-        if owner is not None and liability is not None:
-            relationships.append(
-                (
-                    owner,
-                    RelationshipType.BORROWS,
-                    liability,
-                )
-            )
-
-        # Owner -> Emergency Contact
-        if owner is not None and contact is not None:
-            relationships.append(
-                (
-                    owner,
-                    RelationshipType.HAS_CONTACT,
-                    contact,
-                )
-            )
+                # Owner -> Contact
+                if owner is not None:
+                    self._add_relationship(
+                        relationships,
+                        owner,
+                        RelationshipType.HAS_CONTACT,
+                        current_contact,
+                    )
 
         return NormalizedGraphData(
             entities=list(entities.values()),
             relationships=relationships,
         )
 
+    # -----------------------------------------------------------------
+    # Relationship helper
+    # -----------------------------------------------------------------
+
     @staticmethod
-    def _make_id(prefix: str, value: str) -> str:
+    def _add_relationship(
+        relationships: list[GraphRelationship],
+        source: GraphEntity,
+        relationship_type: RelationshipType,
+        target: GraphEntity,
+    ) -> None:
+        """
+        Add a relationship only if the exact same relationship
+        does not already exist.
+        """
+
+        relationship = (
+            source,
+            relationship_type,
+            target,
+        )
+
+        if relationship not in relationships:
+            relationships.append(relationship)
+
+    # -----------------------------------------------------------------
+    # Deterministic ID
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def _make_id(
+        prefix: str,
+        value: str,
+    ) -> str:
         """Create a deterministic graph ID from a value."""
 
-        normalized = value.lower().replace(" ", "_")
+        normalized = (
+            value.lower()
+            .strip()
+            .replace(" ", "_")
+        )
+
         return f"{prefix}:{normalized}"
+
+    # -----------------------------------------------------------------
+    # OWNER
+    # -----------------------------------------------------------------
 
     @staticmethod
     def _is_owner_field(label: str) -> bool:
         """Return True for supported owner/person fields."""
 
-        return label in {
-            "owner",
-            "owner name",
-            "policy holder",
-            "policyholder",
-            "account holder",
-            "account owner",
-        }
+        return (
+            label in {
+                "owner",
+                "owner name",
+                "primary owner",
+                "policy holder",
+                "policyholder",
+                "account holder",
+                "account owner",
+                "property owner",
+                "borrower",
+            }
+            or label.endswith(" owner")
+        )
+
+    # -----------------------------------------------------------------
+    # ASSET
+    # -----------------------------------------------------------------
 
     @staticmethod
     def _is_asset_field(label: str) -> bool:
-        """Return True for supported asset fields."""
+        """
+        Return True for actual asset fields.
 
-        return label in {
+        Supports fields such as:
+        - Asset
+        - Asset Name
+        - Policy
+        - Policy Name
+        - Life Insurance Policy
+        - Bank Account
+        - Account
+        - Account Name
+        - Property
+        - Property Name
+
+        Explicit identifier fields such as:
+        - Policy Number
+        - Account Number
+        - Loan Number
+
+        are NOT treated as graph entities.
+        """
+
+        # Never treat identifiers or metadata as assets.
+        if any(
+            keyword in label
+            for keyword in (
+                "number",
+                "no.",
+                "id",
+                "identifier",
+                "relationship",
+                "status",
+                "frequency",
+                "premium",
+                "holder",
+                "owner",
+            )
+        ):
+            return False
+
+        # Direct asset labels.
+        if label in {
             "asset",
             "asset name",
             "policy",
             "policy name",
             "account",
             "account name",
+            "bank account",
+            "bank account name",
             "property",
             "property name",
-        }
+        }:
+            return True
+
+        # Insurance / policy names.
+        if "insurance policy" in label:
+            return True
+
+        # Bank-account style fields.
+        if "bank account" in label:
+            return True
+
+        return False
+
+    # -----------------------------------------------------------------
+    # BENEFICIARY / NOMINEE
+    # -----------------------------------------------------------------
 
     @staticmethod
     def _is_beneficiary_field(label: str) -> bool:
         """
         Return True only for actual beneficiary/nominee fields.
 
-        Relationship metadata such as:
-            Nominee Relationship: Daughter
-            Beneficiary Relationship: Son
+        Examples that ARE entities:
+            Nominee
+            Beneficiary
+            Nominee Name
+            Beneficiary Name
 
-        must NOT become graph entities.
+        Examples that are NOT entities:
+            Nominee Relationship
+            Beneficiary Relationship
         """
 
+        # Relationship metadata must never become a person node.
+        if "relationship" in label:
+            return False
+
         return (
-            ("nominee" in label or "beneficiary" in label)
-            and "relationship" not in label
+            "nominee" in label
+            or "beneficiary" in label
         )
+
+    # -----------------------------------------------------------------
+    # LIABILITY
+    # -----------------------------------------------------------------
 
     @staticmethod
     def _is_liability_field(label: str) -> bool:
-        """Return True for supported liability fields."""
+        """
+        Return True only for actual liability names.
+
+        Examples:
+            Home Loan
+            Mortgage
+            Debt
+            Liability
+
+        Identifier fields such as:
+            Loan Number
+            Mortgage Number
+
+        must NOT create separate liability entities.
+        """
+
+        # Identifier / metadata fields are not liabilities.
+        if any(
+            keyword in label
+            for keyword in (
+                "number",
+                "no.",
+                "id",
+                "identifier",
+                "relationship",
+                "status",
+            )
+        ):
+            return False
 
         return (
-            "loan" in label
+            label in {
+                "loan",
+                "loan name",
+                "home loan",
+                "mortgage",
+                "mortgage name",
+                "debt",
+                "debt name",
+                "liability",
+                "liability name",
+            }
+            or "loan" in label
             or "mortgage" in label
-            or "debt" in label
-            or "liability" in label
         )
+
+    # -----------------------------------------------------------------
+    # EMERGENCY CONTACT
+    # -----------------------------------------------------------------
 
     @staticmethod
     def _is_contact_field(label: str) -> bool:
         """
         Return True only for actual contact-name fields.
 
-        Relationship metadata such as:
-            Emergency Contact Relationship: Sister
+        Examples:
+            Emergency Contact
+            Emergency Contact Name
+            Contact
+            Contact Name
 
-        must NOT become graph entities.
+        These are NOT entities:
+            Emergency Contact Relationship
+            Contact Relationship
         """
 
+        # Relationship metadata must not become a contact.
+        if "relationship" in label:
+            return False
+
         return (
-            (
-                "emergency contact" in label
-                or label == "contact"
-                or "contact name" in label
-            )
-            and "relationship" not in label
+            "emergency contact" in label
+            or label == "contact"
+            or "contact name" in label
         )
