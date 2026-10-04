@@ -445,32 +445,62 @@ class GraphFieldNormalizer:
             or "mortgage" in label
         )
 
-    # -----------------------------------------------------------------
+        # -----------------------------------------------------------------
     # EMERGENCY CONTACT
     # -----------------------------------------------------------------
 
     @staticmethod
     def _is_contact_field(label: str) -> bool:
         """
-        Return True only for actual contact-name fields.
+        Return True only for actual emergency-contact NAME fields.
 
-        Examples:
+        Supported contact entity fields:
             Emergency Contact
             Emergency Contact Name
             Contact
             Contact Name
 
-        These are NOT entities:
+        These are NOT graph entities:
             Emergency Contact Relationship
+            Emergency Contact Phone
+            Emergency Contact Number
+            Emergency Contact Mobile
+            Emergency Contact Email
             Contact Relationship
+            Contact Phone
+            Contact Number
+            Contact Mobile
+            Contact Email
         """
 
-        # Relationship metadata must not become a contact.
+        # -------------------------------------------------------------
+        # Relationship metadata must not become a contact entity.
+        # -------------------------------------------------------------
         if "relationship" in label:
             return False
 
+        # -------------------------------------------------------------
+        # Contact details are attributes, not graph entities.
+        # -------------------------------------------------------------
+        if any(
+            keyword in label
+            for keyword in (
+                "phone",
+                "mobile",
+                "telephone",
+                "email",
+                "number",
+                "address",
+            )
+        ):
+            return False
+
+        # -------------------------------------------------------------
+        # Only actual contact-name fields become CONTACT nodes.
+        # -------------------------------------------------------------
         return (
-            "emergency contact" in label
+            label == "emergency contact"
+            or label == "emergency contact name"
             or label == "contact"
-            or "contact name" in label
+            or label == "contact name"
         )
