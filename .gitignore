@@ -40,3 +40,4 @@ Thumbs.db
 *.temp
 # Runtime document storage
 backend/storage/
+storage/
