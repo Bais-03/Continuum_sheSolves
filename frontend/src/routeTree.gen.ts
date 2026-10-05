@@ -15,10 +15,14 @@ import { Route as ContactRouteImport } from './routes/contact'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as GraphRouteImport } from './routes/graph'
 import { Route as GuardianRouteImport } from './routes/guardian'
+import { Route as GuardiansRouteImport } from './routes/guardians'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PlaybookRouteImport } from './routes/playbook'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as UploadRouteImport } from './routes/upload'
+import { Route as GuardianIndexRouteImport } from './routes/guardian/index'
+import { Route as GuardianPortalRouteImport } from './routes/guardian/portal'
+import { Route as GuardianInviteTokenRouteImport } from './routes/guardian/invite/$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -50,6 +54,11 @@ const GuardianRoute = GuardianRouteImport.update({
   path: '/guardian',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GuardiansRoute = GuardiansRouteImport.update({
+  id: '/guardians',
+  path: '/guardians',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -70,6 +79,21 @@ const UploadRoute = UploadRouteImport.update({
   path: '/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GuardianIndexRoute = GuardianIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => GuardianRoute,
+} as any)
+const GuardianPortalRoute = GuardianPortalRouteImport.update({
+  id: '/portal',
+  path: '/portal',
+  getParentRoute: () => GuardianRoute,
+} as any)
+const GuardianInviteTokenRoute = GuardianInviteTokenRouteImport.update({
+  id: '/invite/$token',
+  path: '/invite/$token',
+  getParentRoute: () => GuardianRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -77,11 +101,15 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/graph': typeof GraphRoute
-  '/guardian': typeof GuardianRoute
+  '/guardian': typeof GuardianRouteWithChildren
+  '/guardians': typeof GuardiansRoute
   '/login': typeof LoginRoute
   '/playbook': typeof PlaybookRoute
   '/signup': typeof SignupRoute
   '/upload': typeof UploadRoute
+  '/guardian/portal': typeof GuardianPortalRoute
+  '/guardian/': typeof GuardianIndexRoute
+  '/guardian/invite/$token': typeof GuardianInviteTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -89,11 +117,14 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/graph': typeof GraphRoute
-  '/guardian': typeof GuardianRoute
+  '/guardians': typeof GuardiansRoute
   '/login': typeof LoginRoute
   '/playbook': typeof PlaybookRoute
   '/signup': typeof SignupRoute
   '/upload': typeof UploadRoute
+  '/guardian/portal': typeof GuardianPortalRoute
+  '/guardian': typeof GuardianIndexRoute
+  '/guardian/invite/$token': typeof GuardianInviteTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -102,11 +133,15 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/graph': typeof GraphRoute
-  '/guardian': typeof GuardianRoute
+  '/guardian': typeof GuardianRouteWithChildren
+  '/guardians': typeof GuardiansRoute
   '/login': typeof LoginRoute
   '/playbook': typeof PlaybookRoute
   '/signup': typeof SignupRoute
   '/upload': typeof UploadRoute
+  '/guardian/portal': typeof GuardianPortalRoute
+  '/guardian/': typeof GuardianIndexRoute
+  '/guardian/invite/$token': typeof GuardianInviteTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -117,10 +152,14 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/graph'
     | '/guardian'
+    | '/guardians'
     | '/login'
     | '/playbook'
     | '/signup'
     | '/upload'
+    | '/guardian/portal'
+    | '/guardian/'
+    | '/guardian/invite/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -128,11 +167,14 @@ export interface FileRouteTypes {
     | '/contact'
     | '/dashboard'
     | '/graph'
-    | '/guardian'
+    | '/guardians'
     | '/login'
     | '/playbook'
     | '/signup'
     | '/upload'
+    | '/guardian/portal'
+    | '/guardian'
+    | '/guardian/invite/$token'
   id:
     | '__root__'
     | '/'
@@ -141,10 +183,14 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/graph'
     | '/guardian'
+    | '/guardians'
     | '/login'
     | '/playbook'
     | '/signup'
     | '/upload'
+    | '/guardian/portal'
+    | '/guardian/'
+    | '/guardian/invite/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -153,7 +199,8 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
   GraphRoute: typeof GraphRoute
-  GuardianRoute: typeof GuardianRoute
+  GuardianRoute: typeof GuardianRouteWithChildren
+  GuardiansRoute: typeof GuardiansRoute
   LoginRoute: typeof LoginRoute
   PlaybookRoute: typeof PlaybookRoute
   SignupRoute: typeof SignupRoute
@@ -204,6 +251,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GuardianRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/guardians': {
+      id: '/guardians'
+      path: '/guardians'
+      fullPath: '/guardians'
+      preLoaderRoute: typeof GuardiansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -232,8 +286,45 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/guardian/': {
+      id: '/guardian/'
+      path: '/'
+      fullPath: '/guardian/'
+      preLoaderRoute: typeof GuardianIndexRouteImport
+      parentRoute: typeof GuardianRoute
+    }
+    '/guardian/portal': {
+      id: '/guardian/portal'
+      path: '/portal'
+      fullPath: '/guardian/portal'
+      preLoaderRoute: typeof GuardianPortalRouteImport
+      parentRoute: typeof GuardianRoute
+    }
+    '/guardian/invite/$token': {
+      id: '/guardian/invite/$token'
+      path: '/invite/$token'
+      fullPath: '/guardian/invite/$token'
+      preLoaderRoute: typeof GuardianInviteTokenRouteImport
+      parentRoute: typeof GuardianRoute
+    }
   }
 }
+
+interface GuardianRouteChildren {
+  GuardianPortalRoute: typeof GuardianPortalRoute
+  GuardianIndexRoute: typeof GuardianIndexRoute
+  GuardianInviteTokenRoute: typeof GuardianInviteTokenRoute
+}
+
+const GuardianRouteChildren: GuardianRouteChildren = {
+  GuardianPortalRoute: GuardianPortalRoute,
+  GuardianIndexRoute: GuardianIndexRoute,
+  GuardianInviteTokenRoute: GuardianInviteTokenRoute,
+}
+
+const GuardianRouteWithChildren = GuardianRoute._addFileChildren(
+  GuardianRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -241,7 +332,8 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
   GraphRoute: GraphRoute,
-  GuardianRoute: GuardianRoute,
+  GuardianRoute: GuardianRouteWithChildren,
+  GuardiansRoute: GuardiansRoute,
   LoginRoute: LoginRoute,
   PlaybookRoute: PlaybookRoute,
   SignupRoute: SignupRoute,

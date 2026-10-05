@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { UserPlus } from "lucide-react";
 import { FormEvent, useState } from "react";
-import { createDemoUser } from "@/lib/auth";
+import { signupUser } from "@/lib/auth";
 import { PublicNavbar } from "@/components/PublicNavbar";
 
 export const Route = createFileRoute("/signup")({
@@ -20,16 +20,29 @@ function Signup() {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
+
     if (password.length < 6) {
       setError("Use a password with at least 6 characters.");
       return;
     }
+
     if (password !== confirm) {
       setError("Passwords do not match.");
       return;
     }
-    await createDemoUser(name, email, password);
-    navigate({ to: "/dashboard" });
+
+    try {
+      await signupUser(name, email, password);
+      navigate({ to: "/dashboard" });
+    } catch (err) {
+      console.error("Signup failed:", err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to create account",
+      );
+    }
   };
 
   return (
@@ -100,10 +113,6 @@ function Signup() {
               >
                 <UserPlus className="h-4 w-4" /> Create account
               </button>
-              <p className="text-center text-xs leading-5 text-muted-foreground">
-                Prototype authentication is stored locally in this browser. Replace it with the
-                project backend before production.
-              </p>
               <p className="text-center text-sm text-muted-foreground">
                 Already have an account?{" "}
                 <Link to="/login" className="font-medium text-primary hover:underline">

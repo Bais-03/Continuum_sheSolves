@@ -1,607 +1,677 @@
-# Continuum
+# Continuum — Successor Readiness for Households
 
-## Successor Readiness for Households
-
-> **Continuum is designed around readiness rather than storage.**
->
-> It helps households understand what exists, what is missing, what a successor would need to know, and what should happen first during a crisis.
-
-**Domain:** FinTech · Digital Legacy  
 **Team:** Clock it  
-**Problem Statement:** Continuum — Successor Readiness for Households
+**Event:** SHE SOLVES 3.0  
+**Domain:** FinTech / Digital Legacy
+
+> **Documents are not readiness. Continuum measures it and rehearses it.**
+
+Continuum is a working local prototype built on **synthetic data**. It is not financial advice, not legal advice, and not a production financial system.
 
 ---
 
-## Overview
+## 1. Project Overview
 
-One person often holds most of a household's financial knowledge. If that person dies or becomes unavailable, the family may have to reconstruct that knowledge while already dealing with a difficult situation.
+### The Problem
 
-Continuum approaches this problem as a **successor-readiness problem**, rather than simply a document-storage problem.
+In many households, one person holds most of the financial and administrative knowledge. If that person dies or becomes unavailable, the family may have to reconstruct critical information during an already difficult period.
 
-Instead of only storing documents and providing access, Continuum aims to:
+Simply storing documents does not solve this problem. Someone still has to **find the right information, understand it, know what is missing, and act on it**.
 
-- measure household readiness,
-- identify knowledge gaps,
-- map household information into a knowledge graph,
-- simulate the first 30 days after a disruption,
-- generate a prioritized action playbook, and
-- support guardian threshold release.
+### The Continuum Approach
 
----
+Continuum treats household continuity as a **readiness problem rather than a document-storage problem**.
 
-## The Core Idea
-
-### Traditional storage-first approach
+It transforms household information into a structured readiness workflow:
 
 ```text
-Store documents
-      ↓
-Provide access
-      ↓
-Depend on manual discovery
+UPLOAD → EXTRACT → CONFIRM → MAP → SCORE → SIMULATE → ACT
 ```
 
-### Continuum
-
-```text
-Measure readiness
-      ↓
-Identify knowledge gaps
-      ↓
-Build household knowledge graph
-      ↓
-Simulate Day-Zero
-      ↓
-Generate prioritized action playbook
-      ↓
-Support guardian threshold release
-```
-
-The central idea is simple:
-
-> **Documents are not readiness. Continuum measures readiness and turns missing knowledge into actionable next steps.**
-
----
-
-## How Continuum Works
-
-```text
-UPLOAD
-   ↓
-EXTRACT
-   ↓
-CONFIRM
-   ↓
-MAP
-   ↓
-SCORE
-   ↓
-SIMULATE
-   ↓
-ACT
-```
-
-### 1. Upload
-
-The prototype accepts synthetic household documents through the document workflow.
-
-The presentation currently describes **8 synthetic document types**.
-
-### 2. Extract
-
-Fields are extracted from uploaded documents and associated with confidence scores.
-
-The current prototype uses a **`.txt` / `.md` mock extractor**. OCR and LLM-assisted extraction are identified as future enhancements.
-
-### 3. Confirm
-
-A person reviews and confirms extracted information.
-
-This human-confirmation step is important because extracted information is not automatically treated as trusted household knowledge.
-
-### 4. Map
-
-Confirmed information is mapped into a **household knowledge graph**, connecting people, assets, liabilities, documents, and responsibilities.
-
-### 5. Score
-
-Continuum evaluates household readiness across **seven dimensions**, producing dimension scores from 0–100 and an overall readiness score.
-
-### 6. Simulate
-
-The Day-Zero simulator represents the **first 30 days** after the primary knowledge-holder becomes unavailable.
-
-Knowledge gaps are converted into prioritized actions.
-
-### 7. Act
-
-The resulting playbook turns identified gaps into concrete tasks and supports the guardian-release concept.
-
----
-
-# Key Features
-
-| Feature | Purpose |
+| Stage | What happens in the prototype |
 |---|---|
-| Document workflow | Upload and process synthetic household documents |
-| Field extraction | Extract fields with confidence information |
-| Human confirmation | Let a person approve extracted fields |
-| Household knowledge graph | Map household entities and relationships |
-| 7-dimension readiness score | Measure successor readiness |
-| Knowledge-gap detection | Highlight missing household relationships/information |
-| Day-Zero simulation | Model the first 30 days |
-| Prioritized playbook | Convert gaps into actionable tasks |
-| Guardian release | Support threshold-based guardian release |
-| Shamir 2-of-3 | Represent threshold secret-sharing for guardian release |
-| AES-GCM | Represent encrypted vault data |
-| SQLite storage | Persist prototype household information |
+| **Upload** | A household user uploads a supported document. |
+| **Extract** | Fields are parsed from the document as unconfirmed records. |
+| **Confirm** | The household user confirms, edits, or rejects extracted fields. |
+| **Map** | Confirmed information is mapped into a household knowledge graph. |
+| **Score** | A transparent rule-based engine scores seven readiness dimensions. |
+| **Simulate** | Day-Zero analysis models the first 30 days after the household owner becomes unavailable. |
+| **Act** | Identified gaps become prioritized tasks in the playbook. |
 
-> These capabilities describe the project as presented in the official prototype deck. The deck explicitly identifies OCR, LLM-assisted extraction, client-side encryption, security hardening, and production-grade deployment as future enhancements.
+### Core Idea
 
----
+Continuum answers a more useful question than:
 
-# Seven Readiness Dimensions
+> **“Where are the documents?”**
 
-Continuum measures the things a successor would need to understand.
+It asks:
 
-| Dimension | What it represents |
-|---|---|
-| **Asset Discovery** | Whether important household assets are known |
-| **Beneficiary Completeness** | Whether beneficiary/nominee information is sufficiently mapped |
-| **Deadline Awareness** | Awareness of important deadlines and time-sensitive obligations |
-| **Liability Awareness** | Understanding of household liabilities and obligations |
-| **Document Accessibility** | Whether required records can be located and accessed |
-| **Successor Knowledge** | How much of the household's important knowledge is transferable |
-| **Emergency Contacts** | Availability of relevant emergency/contact information |
-
-Each dimension is represented on a **0–100 scale**.
-
-The prototype uses explicit, rule-based evaluation rather than claiming a real-world benchmark.
+> **“If the person who knows everything becomes unavailable tomorrow, would the household actually be ready?”**
 
 ---
 
-# Readiness Scoring
+## 2. Features Implemented
 
-The prototype's scoring flow is:
+### 2.1 Household Intelligence
+
+- **Authentication**
+  - Signup, login, logout and `/auth/me`.
+  - Signup automatically creates the household.
+  - Household data is isolated between users.
+
+- **Document Upload**
+  - Multipart document upload.
+  - Local file storage.
+  - Configurable upload-size limit.
+  - Current extraction workflow supports plain-text `.txt` / `.md` documents.
+
+- **Extraction & Confirmation**
+  - Deterministic parsing of `Key: Value` lines.
+  - Extracted values initially remain unconfirmed.
+  - Users can edit, confirm, or reject individual fields.
+  - Confirmation state is persisted.
+
+- **Readiness Scoring**
+  - Transparent, formula-driven scoring.
+  - Seven readiness dimensions.
+  - Scores are calculated from confirmed information.
+  - Scores update as household information changes.
+
+### 2.2 Knowledge & Continuity
+
+- **Household Knowledge Graph**
+  - Built using NetworkX.
+  - Represents household entities and relationships.
+  - Identifies missing relationships and knowledge gaps.
+
+- **Day-Zero Analysis**
+  - Models the first 30 days after the household owner becomes unavailable.
+  - Converts identified knowledge gaps into actionable priorities.
+
+- **Prioritized Playbook**
+  - Knowledge gaps become household tasks.
+  - Tasks can be updated as progress is made.
+  - Helps turn readiness gaps into concrete actions.
+
+### 2.3 Guardian Release Workflow
+
+Continuum includes a separate Guardian workflow designed around a clear privacy boundary:
+
+> **Guardians approve. They do not browse.**
+
+Implemented functionality includes:
+
+- Household owners can create and manage Guardians.
+- Guardian invitation links.
+- Guardian signup through an invitation.
+- Independent Guardian login.
+- Dedicated Guardian Portal.
+- Guardian route and API separation from the household workspace.
+- Database-backed release requests.
+- Approval records assigned to eligible Guardians.
+- **2-of-3 Guardian approval threshold.**
+- Approve / reject handling.
+- `RELEASED` state after the threshold is reached.
+- Persistent approval history.
+- Household-owner view of release status.
+
+Guardians do **not** receive access to:
+
+- Household dashboard
+- Private household documents
+- Readiness scores
+- Knowledge graph
+- Household workspace routes
+
+Approving a release request authorizes the release workflow; it does **not** provide the Guardian with unrestricted access to the household workspace.
+
+### 2.4 Seven Readiness Dimensions
+
+| Dimension | Weight |
+|---|---:|
+| Asset Discovery | 1.0 |
+| Beneficiary Completeness | 1.5 |
+| Deadline Awareness | 1.0 |
+| Liability Awareness | 1.0 |
+| Document Accessibility | 1.25 |
+| Successor Knowledge | 1.5 |
+| Emergency Contacts | 1.0 |
+
+The prototype uses explicit rules rather than an AI/ML model.
 
 ```text
-7 dimensions
-      ↓
-Rule-based evaluation
-      ↓
-Dimension scores (0–100)
-      ↓
-Overall readiness score
-      ↓
-Identified gaps
-      ↓
-Day-Zero actions
+Dimension score = min(100, base + 20 × confirmed fields)
+
+Overall score = weighted average of the seven dimensions
 ```
 
-The official presentation demonstrates an overall score of **56/100** on synthetic demo data.
-
-This number is a prototype output, **not a real-world benchmark**.
-
-The presentation also uses gold highlighting for dimensions below 60 in the demonstrated readiness view.
+> Any readiness score shown by the prototype is generated from its rules and synthetic data. It is **not a real-world benchmark or financial assessment**.
 
 ---
 
-# Knowledge Graph
+## 3. Technology Used
 
-Continuum maps confirmed household information into a relationship-oriented representation.
+| Layer | Technology | Purpose |
+|---|---|---|
+| **Frontend** | React 19, TanStack Start / Router, Vite, TypeScript | Household workspace and Guardian Portal |
+| **UI** | Tailwind CSS 4, Radix UI, Recharts | Styling, components and visualizations |
+| **Backend** | Python 3.12, FastAPI, Pydantic | REST APIs, validation and application services |
+| **Database** | SQLite | Persistent application data |
+| **ORM / Migrations** | SQLAlchemy 2, Alembic | Database access and schema migrations |
+| **Knowledge Graph** | NetworkX | Household entities, relationships and gap analysis |
+| **Authentication** | Cookie-based JWT | User authentication and session handling |
+| **Security** | CSRF protection, bcrypt password hashing, CORS allow-list | Protection of state-changing requests and credentials |
+| **Testing** | pytest, Vitest | Backend and frontend testing |
 
-Conceptually:
+### AI / ML
 
-```text
-                    Household Owner
-                    /      |       \
-                   /       |        \
-                Asset    Liability   Contact
-                  |
-             Beneficiary
+**No AI/ML model is used in the current prototype.**
+
+Document extraction is deterministic parsing for supported plain-text documents, and readiness scoring is implemented using explicit rules.
+
+OCR and LLM-assisted extraction are planned future enhancements.
+
+---
+
+## 4. Architecture
+
+```mermaid
+flowchart TD
+    A[React / Vite Frontend] --> B[FastAPI Backend]
+
+    B --> C[Document & Field Services]
+    B --> D[Readiness Service]
+    B --> E[Guardian Service]
+    B --> F[Day-Zero / Playbook Service]
+
+    C --> G[(SQLite)]
+    D --> G
+    E --> G
+    F --> G
+
+    C --> H[NetworkX Knowledge Graph]
+    H --> F
+
+    F --> A
+    E --> A
 ```
 
-The graph is intended to make relationships and missing connections visible instead of leaving information scattered across individual documents.
-
-Knowledge gaps can then feed directly into the Day-Zero playbook.
-
----
-
-# Day-Zero
-
-### The first 30 days
-
-Day-Zero is Continuum's simulation layer for the period immediately following the loss or unavailability of the household's primary knowledge-holder.
-
-Instead of presenting a generic checklist, the prototype connects identified knowledge gaps to prioritized actions.
+### End-to-End Flow
 
 ```text
-Knowledge Graph
-      ↓
-Knowledge Gap
-      ↓
-Priority
-      ↓
-Day-Zero Action
-```
-
-The official prototype presentation summarizes this as:
-
-> **Each gap becomes a task.**
-
-This creates a direct connection between **readiness measurement** and **action**.
-
----
-
-# Guardian Release
-
-Continuum includes a Guardian Vault concept based on:
-
-- **Shamir 2-of-3 threshold secret sharing**
-- **AES-GCM**
-- guardian-based threshold release
-
-The prototype presentation describes the release mechanism as **simulated**.
-
-Conceptually:
-
-```text
-Guardian 1 ─┐
-Guardian 2 ─┼── 2 of 3 threshold ──→ Vault release
-Guardian 3 ─┘
-```
-
-The project does **not** claim production-grade security.
-
-The official presentation explicitly identifies:
-
-- client-side encryption,
-- security hardening, and
-- production-grade deployment
-
-as future enhancements.
-
----
-
-# Technical Approach
-
-The official architecture is organized around the following layers:
-
-```text
-User Browser
-     ↓
-React Frontend
-     ↓
+User
+  │
+  ▼
+React / Vite Frontend
+  │
+  ▼
 FastAPI Backend
-     ↓
-Document Pipeline
-     ↓
-SQLite + Household Model
-     ↓
-Knowledge Graph
-     ↓
-Readiness Engine
-     ↓
-Day-Zero Simulator
-     ↓
-Guardian Vault
-```
-
-### Technology stack
-
-| Layer | Technology |
-|---|---|
-| Frontend | React |
-| Frontend tooling | Vite |
-| Frontend language | TypeScript |
-| Styling | Tailwind CSS |
-| Backend | FastAPI |
-| Backend language | Python |
-| API/data validation | Pydantic |
-| API style | REST / JSON |
-| Prototype database | SQLite |
-| Knowledge graph | NetworkX |
-| Readiness evaluation | Rule-based scoring and gaps |
-| Document extraction | `.txt` / `.md` mock extractor |
-| Guardian threshold concept | Shamir 2-of-3 |
-| Encryption concept | AES-GCM |
-
----
-
-# Current Prototype Status
-
-The official project presentation identifies the following as implemented in the prototype:
-
-- `.txt` / `.md` extraction using a mock extractor
-- rule-based scoring and gap detection
-- NetworkX knowledge graph
-- SQLite storage
-- Shamir 2-of-3
-- AES-GCM
-- automated backend tests
-- a working end-to-end prototype flow
-- local/offline execution
-- synthetic dataset
-
-The presentation reports **31 automated backend tests** for the prototype snapshot represented in the deck.
-
----
-
-# Prototype Workflow
-
-The demonstrated application flow is:
-
-```text
-┌───────────────┐
-│  1 Dashboard  │
-│ Readiness     │
-│ Score         │
-└───────┬───────┘
-        ↓
-┌────────────────────┐
-│ 2 Upload & Confirm │
-│ Extract → Review   │
-└────────┬───────────┘
-         ↓
-┌────────────────────┐
-│ 3 Knowledge Graph  │
-│ Entities + Gaps    │
-└────────┬───────────┘
-         ↓
-┌────────────────────┐
-│ 4 Day-Zero         │
-│ Prioritized Tasks  │
-└────────┬───────────┘
-         ↓
-┌────────────────────┐
-│ 5 Guardian Release │
-│ Threshold concept  │
-└────────────────────┘
-```
-
-The presentation describes this as a **working end-to-end workflow**.
-
----
-
-# Impact and Benefits
-
-Continuum is intended to help:
-
-### Women in husband-managed households
-
-The presentation identifies women in husband-managed households, roughly ages 35–65, as one important audience: helping them see what exists before a crisis.
-
-### Adult children and guardians
-
-Continuum can help adult children and guardians understand where important records are and what should happen first.
-
-### Potential benefits
-
-- **Social:** less confusion and fewer rushed decisions
-- **Economic:** fewer missed premiums and EMIs, without promising savings
-- **Environmental:** potentially fewer duplicate paper copies
-
-The presentation explicitly identifies these as intended benefits rather than measured outcomes.
-
----
-
-# Risks and Design Considerations
-
-Continuum is presented as a prototype and intentionally addresses several risks:
-
-| Risk | Prototype response |
-|---|---|
-| Privacy | Synthetic data currently; client-side encryption planned |
-| Messy documents | Confidence scores + human confirmation |
-| Being mistaken for financial advice | Labeled checklist and planned expert review before any pilot |
-
-The system is therefore positioned as a **readiness and organizational tool**, not as financial or legal advice.
-
----
-
-# Current Limitations
-
-The official presentation identifies these limitations:
-
-1. **Mock extractor**
-2. **Synthetic documents**
-3. **Guardian release is simulated**
-
-The current prototype should therefore not be treated as a production financial-legacy platform.
-
----
-
-# Future Enhancements
-
-The project roadmap includes:
-
-- OCR for scanned documents
-- LLM-assisted extraction
-- client-side encryption
-- security hardening
-- production-grade deployment
-- real-world document testing
-- user/advisor validation
-
-These are future enhancements, not claims about the current prototype.
-
----
-
-# Validation Roadmap
-
-The presentation identifies four next validation areas:
-
-```text
-1. OCR / LLM extraction
-          ↓
-2. Real-world document testing
-          ↓
-3. Security hardening
-          ↓
-4. User / advisor validation
-```
-
-This progression is intended to move the prototype from synthetic/local validation toward broader validation.
-
----
-
-# Why Continuum Is Different
-
-Continuum does not begin with the question:
-
-> "Where are my documents?"
-
-It begins with:
-
-> **"If I were unavailable tomorrow, would my successor be ready?"**
-
-That changes the product from a passive storage layer into a readiness-oriented workflow:
-
-```text
-Documents
-   ↓
-Knowledge
-   ↓
-Relationships
-   ↓
-Readiness
-   ↓
-Gaps
-   ↓
-Actions
-   ↓
-Preparedness
+  │
+  ├── Authentication
+  ├── Document & Field Services
+  ├── Readiness Engine
+  ├── Guardian Service
+  └── Day-Zero / Playbook
+          │
+          ▼
+       SQLite
+          │
+          ▼
+  NetworkX Knowledge Graph
+          │
+          ▼
+   Gaps → Priorities → Tasks
 ```
 
 ---
 
-# Demo Data
-
-The prototype uses **synthetic documents and synthetic household data**.
-
-This is intentional: the presentation explicitly identifies synthetic data/documents as part of the current prototype and lists real-world document testing as a next validation step.
-
-Do not use real sensitive financial or identity documents for a prototype demonstration unless the system has been appropriately hardened and validated for that purpose.
-
----
-
-# Project Structure
-
-The prototype follows a frontend/backend architecture with dedicated layers for the document pipeline, household model, readiness logic, knowledge graph, Day-Zero simulation, and guardian functionality.
-
-A high-level representation is:
+## 5. Project Structure
 
 ```text
-Continuum/
-├── frontend/
-│   ├── React / TypeScript UI
-│   ├── Dashboard
-│   ├── Upload & Confirm
-│   ├── Knowledge Graph
-│   ├── Day-Zero
-│   └── Guardian Release
-│
+.
 ├── backend/
-│   ├── FastAPI API
-│   ├── Household / document state
-│   ├── Readiness engine
-│   ├── Knowledge graph
-│   ├── Day-Zero simulator
-│   └── Guardian / vault logic
+│   ├── app/
+│   │   ├── api/
+│   │   │   └── endpoints/       # Auth, households, documents, fields, scores, tasks, graph, Guardian
+│   │   ├── services/            # Extraction, readiness, graph, storage, auth, Guardian and domain services
+│   │   ├── graph/               # Entities, relationships, normalizer, gap detector, builder
+│   │   ├── dayzero/             # Generator and prioritizer
+│   │   ├── models/              # SQLAlchemy models
+│   │   ├── schemas/             # Pydantic schemas
+│   │   ├── db/                  # Database configuration
+│   │   ├── config.py
+│   │   └── main.py
+│   ├── alembic/
+│   │   └── versions/            # Database migrations
+│   ├── tests/
+│   ├── requirements.txt
+│   └── .env.example
 │
-└── README.md
+├── frontend/
+│   └── src/
+│       ├── routes/              # Application routes and Guardian routes
+│       ├── components/          # Reusable UI components
+│       └── lib/                 # API client, authentication and utilities
+│
+└── docs/
+    ├── ARCHITECTURE.md
+    └── WEB_FLOW.md
 ```
 
-> The detailed repository structure should be treated as implementation-specific; this README intentionally keeps this section at the architecture level.
+---
+
+## 6. How to Install and Run
+
+### Prerequisites
+
+Install:
+
+- Python **3.12**
+- Node.js with npm
+- Git
+
+### 6.1 Clone the Repository
+
+```bash
+git clone https://github.com/Bais-03/Continuum_sheSolves.git
+cd Continuum_sheSolves
+```
+
+### 6.2 Backend Setup
+
+#### macOS / Linux
+
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+#### Windows PowerShell
+
+```powershell
+cd backend
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+### 6.3 Configure Environment Variables
+
+Copy the example environment file:
+
+```bash
+cp .env.example .env
+```
+
+On Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edit `backend/.env` and replace development placeholders where required.
+
+For local HTTP development, keep:
+
+```text
+COOKIE_SECURE=false
+```
+
+### 6.4 Run Database Migrations
+
+From the `backend` directory:
+
+```bash
+alembic upgrade head
+```
+
+### 6.5 Start the Backend
+
+```bash
+uvicorn app.main:app --reload --port 8000
+```
+
+The backend will be available at:
+
+```text
+http://localhost:8000
+```
+
+API documentation:
+
+```text
+http://localhost:8000/api/v1/docs
+```
+
+Health check:
+
+```text
+http://localhost:8000/api/v1/health
+```
+
+### 6.6 Start the Frontend
+
+Open a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open the URL printed by Vite.
+
+The backend must be running on port `8000`, and the frontend origin must be included in the backend's `ALLOWED_ORIGINS`.
 
 ---
 
-# Local Prototype
+## 7. Testing
 
-The official presentation describes Continuum as capable of **local / offline execution** using synthetic data.
+### Backend
 
-Because the exact repository scripts and environment configuration are implementation-specific, follow the setup instructions provided with the project codebase when running the prototype locally.
+```bash
+cd backend
+pytest tests/ -v
+```
 
----
+### Frontend
 
-# Security Position
+From the project root:
 
-Continuum handles a sensitive problem domain, so technical honesty is important.
-
-The prototype presentation identifies AES-GCM and Shamir 2-of-3 as implemented technologies/concepts, while also explicitly listing **client-side encryption and security hardening as future enhancements**.
-
-Accordingly, Continuum should **not** be described as:
-
-- bank-grade security,
-- military-grade security,
-- fully secure,
-- unhackable,
-- production-ready security, or
-- guaranteed privacy.
-
-It is a hackathon/prototype system demonstrating the architecture and workflow.
+```bash
+cd frontend
+npm test
+```
 
 ---
 
-# Research and References
+## 8. Credentials & Setup Instructions
 
-The official presentation references:
+### Required Local Configuration
 
-### Problem context
+Create:
 
-1. **Merrill Lynch & Age Wave (2018)** — survey on financial challenges of widowhood.
-2. **Reserve Bank of India (2023)** — UDGAM portal for searching unclaimed deposits.
-3. **Rajya Sabha reply, 11 Aug 2026** — unclaimed deposits in the RBI's DEA Fund, reported as ₹86,917 crore as of 30 Jun 2026.
+```text
+backend/.env
+```
 
-### Technology
+from:
 
-- Shamir, A. (1979). *How to Share a Secret*. Communications of the ACM, 22(11).
-- NIST SP 800-38D — AES Galois/Counter Mode.
-- PyCryptodome — Shamir secret sharing.
-- FastAPI documentation.
-- NetworkX documentation.
-- React documentation.
-- Vite documentation.
-- Tailwind CSS documentation.
+```text
+backend/.env.example
+```
+
+No real secrets should be committed to the repository.
+
+| Variable | Purpose |
+|---|---|
+| `SECRET_KEY` | JWT signing secret. Replace the development placeholder. |
+| `CSRF_SECRET` | Separate secret used for CSRF protection. |
+| `DATABASE_URL` | Database connection. Defaults to SQLite for local development. |
+| `ALLOWED_ORIGINS` | Comma-separated frontend origins allowed by the backend. |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Authentication token lifetime. |
+| `COOKIE_SECURE` | Cookie security setting. Use `false` for local HTTP development. |
+| `COOKIE_SAMESITE` | Cookie SameSite policy. |
+| `STORAGE_DIR` | Local document storage directory. |
+| `MAX_UPLOAD_SIZE` | Maximum upload size; default is 5 MB. |
+
+For stronger secrets during local testing, generate random values, for example:
+
+```bash
+openssl rand -hex 32
+```
+
+### Demo Credentials
+
+No shared production credentials are included in the repository.
+
+Create a household account from the `/signup` page.
+
+### Guardian Demo Flow
+
+To reproduce the Guardian workflow locally:
+
+1. Create a household owner account.
+2. Create or invite three Guardians.
+3. Complete the Guardian invitation/signup flow for each Guardian.
+4. Log in as the household owner.
+5. Create a Guardian release request.
+6. Log in as two assigned Guardians.
+7. Approve the request from both Guardian accounts.
+8. Return to the household owner account.
+9. Verify that the request changes to `RELEASED`.
+10. The third Guardian can remain pending.
+
+The tested prototype flow follows this pattern:
+
+```text
+Household Owner
+      │
+      ▼
+Creates Release Request
+      │
+      ├───────────────┐
+      ▼               ▼
+ Guardian 1       Guardian 2
+   APPROVE           APPROVE
+      │               │
+      └───────┬───────┘
+              ▼
+       2-of-3 reached
+              │
+              ▼
+          RELEASED
+
+ Guardian 3
+   PENDING
+```
 
 ---
 
-# Project Links
+## 9. Screenshots
 
-**GitHub Repository**
+> Replace the image paths below with the final screenshot files committed to the repository.
 
+### Dashboard — Readiness Score
+
+![Continuum Dashboard — Readiness Score](docs/screenshots/dashboard.png)
+
+The dashboard shows the seven readiness dimensions, overall readiness score and identified weak areas.
+
+### Household Knowledge Graph
+
+![Continuum Knowledge Graph](docs/screenshots/knowledge-graph.png)
+
+The knowledge graph visualizes confirmed household entities, relationships and identified gaps.
+
+### Day-Zero Playbook
+
+![Continuum Day-Zero Playbook](docs/screenshots/day-zero.png)
+
+The Day-Zero view turns continuity gaps into prioritized actions for the first 30 days.
+
+### Guardian 2-of-3 Release Workflow
+
+![Continuum Guardian Release Workflow](docs/screenshots/guardian-release.png)
+
+The Guardian workflow demonstrates two approvals reaching the 2-of-3 threshold while the third Guardian remains pending. Guardians do not receive access to household documents through the approval workflow.
+
+---
+
+## 10. GitHub Repository
+
+**Repository:**  
 https://github.com/Bais-03/Continuum_sheSolves
 
-**Demo Video**
+The repository contains the source code, backend and frontend applications, database migrations, tests, documentation and project setup instructions.
+
+---
+
+## 11. Deployment & Demo
+
+### Deployment
+
+**N/A — the prototype is currently demonstrated through local execution.**
+
+### Demo Video
 
 https://www.youtube.com/watch?v=1Gdug3ZF8nk
 
 ---
 
-# Team
+## 12. Current Working Status
 
-## Clock it
+Continuum is a **working local prototype tested with synthetic data**.
 
-**Continuum — Successor Readiness for Households**
+| Area | Status |
+|---|---|
+| Authentication and household workspace | Working |
+| Document upload and confirmation | Working |
+| Readiness scoring | Working |
+| Knowledge graph | Working |
+| Day-Zero analysis | Working |
+| Prioritized playbook | Working |
+| Guardian accounts and invitations | Working |
+| Guardian Portal | Working |
+| Guardian access isolation | Working |
+| 2-of-3 Guardian approval | Working |
+| Approve / reject workflow | Working |
+| `RELEASED` state | Working |
+| Database persistence | Working |
 
-Built for **SHE SOLVES 3.0**.
+### Tested Guardian Flow
+
+The end-to-end synthetic Guardian flow has been tested as:
+
+```text
+Household owner creates release request
+                ↓
+Guardian Meera approves
+                ↓
+Guardian Priya approves
+                ↓
+2-of-3 threshold reached
+                ↓
+Request becomes RELEASED
+                ↓
+Guardian Ved remains pending
+```
 
 ---
 
-## Prototype Disclaimer
+## 13. Known Limitations
 
-Continuum is a prototype created for demonstration and validation.
+Continuum is intentionally presented as a prototype rather than a production financial system.
 
-It uses synthetic data and should not be treated as financial, legal, investment, insurance, or estate-planning advice.
+### Current limitations
 
-The readiness score is a rule-based prototype output and **not a real-world benchmark**.
-
-Guardian release is simulated, and several production capabilities remain future enhancements.
+- Synthetic data and synthetic documents are used for the prototype.
+- Document extraction currently supports plain-text `.txt` / `.md` documents using deterministic parsing.
+- Scanned-document OCR is not implemented.
+- LLM-assisted document extraction is not implemented.
+- Production-grade security hardening is not complete.
+- Client-side encryption is not implemented.
+- Production deployment is not currently provided.
+- Real-world document testing has not yet been completed.
+- User and advisor validation has not yet been completed.
+- Guardian release authorization is implemented, but approval does not currently provide unrestricted household-document browsing.
 
 ---
 
-## The Continuum Principle
+## 14. Future Enhancements
 
-> **Documents are not readiness.**
->
-> **Readiness means knowing what exists, understanding what is missing, and knowing what to do next.**
+Planned future work includes:
+
+- OCR for scanned documents.
+- LLM-assisted extraction with appropriate human confirmation.
+- Stronger production security hardening.
+- Client-side encryption.
+- Production-grade deployment.
+- Testing with real-world document formats.
+- User and financial-advisor validation.
+- Measuring practical continuity outcomes such as:
+  - Time required to find critical records.
+  - Missed deadlines.
+  - Household readiness improvement over time.
+
+---
+
+## 15. Privacy & Security Boundary
+
+Continuum is designed around the principle that **readiness should not require broad access to private household information**.
+
+The Guardian workflow therefore follows:
+
+> **Guardians approve. They do not browse.**
+
+Guardian accounts are separated from the household workspace at the application route and API layers.
+
+A Guardian sees only release requests for which they have an assigned approval record.
+
+Approval authorizes the release workflow; it does not automatically expose the household dashboard, documents, readiness score or knowledge graph to the Guardian.
+
+This prototype-level boundary should not be interpreted as a completed production security architecture.
+
+---
+
+## 16. Prototype Philosophy
+
+Continuum is based on a simple distinction:
+
+```text
+Documents ≠ Readiness
+```
+
+A household can have every important document and still be unprepared if:
+
+- nobody knows where a document is,
+- nobody understands what it means,
+- beneficiaries are unclear,
+- deadlines are unknown,
+- liabilities are not understood,
+- relationships between assets and responsibilities are missing,
+- or the successor has never rehearsed what to do.
+
+Continuum therefore moves from:
+
+```text
+Storage
+   ↓
+Understanding
+   ↓
+Readiness
+   ↓
+Rehearsal
+   ↓
+Action
+```
+
+---
+
+## 17. Disclaimer
+
+Continuum is a prototype using synthetic data.
+
+It is:
+
+- **Not financial advice**
+- **Not legal advice**
+- **Not a production financial system**
+- **Not a substitute for professional financial, legal or estate-planning advice**
+
+Any readiness score, recommendation or simulation shown by the prototype is generated from prototype rules and synthetic data and should not be interpreted as a real-world financial or legal assessment.
+
+---
+
+## 18. Team
+
+### Clock it
+
+**SHE SOLVES 3.0**
+
+**Project:** Continuum — Successor Readiness for Households  
+**Domain:** FinTech / Digital Legacy
+
+> **Documents are not readiness. Continuum measures it and rehearses it.**
