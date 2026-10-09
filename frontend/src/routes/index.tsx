@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { ContinuumMark } from "@/components/ui/ContinuumMark";
 import { ArrowRight, CheckCircle2, FileText, GitBranch, ShieldCheck, Sparkles } from "lucide-react";
 import { PublicFooter } from "@/components/PublicFooter";
 import { PublicNavbar } from "@/components/PublicNavbar";
@@ -64,11 +65,7 @@ function Home() {
               <div className="absolute inset-8 rounded-full bg-gold/20 blur-3xl" />
               <div className="relative rounded-2xl border bg-card p-7 shadow-sm">
                 <div className="flex items-center gap-3 border-b pb-5">
-                  <img
-                    src="/continuum-mark.png"
-                    alt="Continuum"
-                    className="h-14 w-14 object-contain"
-                  />
+                  <ContinuumMark size={44} />
                   <div>
                     <p className="font-display text-xl">
                       Continuum<span className="text-gold">.</span>

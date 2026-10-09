@@ -17,6 +17,7 @@ import { Route as GraphRouteImport } from './routes/graph'
 import { Route as GuardianRouteImport } from './routes/guardian'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PlaybookRouteImport } from './routes/playbook'
+import { Route as SecurityRouteImport } from './routes/security'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as UploadRouteImport } from './routes/upload'
 
@@ -60,6 +61,11 @@ const PlaybookRoute = PlaybookRouteImport.update({
   path: '/playbook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SecurityRoute = SecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
   path: '/signup',
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/guardian': typeof GuardianRoute
   '/login': typeof LoginRoute
   '/playbook': typeof PlaybookRoute
+  '/security': typeof SecurityRoute
   '/signup': typeof SignupRoute
   '/upload': typeof UploadRoute
 }
@@ -92,6 +99,7 @@ export interface FileRoutesByTo {
   '/guardian': typeof GuardianRoute
   '/login': typeof LoginRoute
   '/playbook': typeof PlaybookRoute
+  '/security': typeof SecurityRoute
   '/signup': typeof SignupRoute
   '/upload': typeof UploadRoute
 }
@@ -105,6 +113,7 @@ export interface FileRoutesById {
   '/guardian': typeof GuardianRoute
   '/login': typeof LoginRoute
   '/playbook': typeof PlaybookRoute
+  '/security': typeof SecurityRoute
   '/signup': typeof SignupRoute
   '/upload': typeof UploadRoute
 }
@@ -119,6 +128,7 @@ export interface FileRouteTypes {
     | '/guardian'
     | '/login'
     | '/playbook'
+    | '/security'
     | '/signup'
     | '/upload'
   fileRoutesByTo: FileRoutesByTo
@@ -131,6 +141,7 @@ export interface FileRouteTypes {
     | '/guardian'
     | '/login'
     | '/playbook'
+    | '/security'
     | '/signup'
     | '/upload'
   id:
@@ -143,6 +154,7 @@ export interface FileRouteTypes {
     | '/guardian'
     | '/login'
     | '/playbook'
+    | '/security'
     | '/signup'
     | '/upload'
   fileRoutesById: FileRoutesById
@@ -156,6 +168,7 @@ export interface RootRouteChildren {
   GuardianRoute: typeof GuardianRoute
   LoginRoute: typeof LoginRoute
   PlaybookRoute: typeof PlaybookRoute
+  SecurityRoute: typeof SecurityRoute
   SignupRoute: typeof SignupRoute
   UploadRoute: typeof UploadRoute
 }
@@ -218,6 +231,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlaybookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/security': {
+      id: '/security'
+      path: '/security'
+      fullPath: '/security'
+      preLoaderRoute: typeof SecurityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/signup': {
       id: '/signup'
       path: '/signup'
@@ -244,6 +264,7 @@ const rootRouteChildren: RootRouteChildren = {
   GuardianRoute: GuardianRoute,
   LoginRoute: LoginRoute,
   PlaybookRoute: PlaybookRoute,
+  SecurityRoute: SecurityRoute,
   SignupRoute: SignupRoute,
   UploadRoute: UploadRoute,
 }
