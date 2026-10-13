@@ -68,3 +68,26 @@ class GuardianReleaseSummaryResponse(BaseModel):
 
     created_at: datetime
     expires_at: Optional[datetime] = None
+
+class SuccessorFieldResponse(BaseModel):
+    """Confirmed field information available after an authorized release."""
+
+    field_label: str
+    extracted_value: str
+    readiness_dimension: Optional[str] = None
+
+
+class SuccessorDocumentResponse(BaseModel):
+    """Limited document metadata and confirmed extracted fields."""
+
+    filename: str
+    document_type: Optional[str] = None
+    fields: list[SuccessorFieldResponse] = Field(default_factory=list)
+
+
+class SuccessorAccessResponse(BaseModel):
+    """Restricted successor data returned after an approved release."""
+
+    release_request_id: str
+    release_status: str
+    documents: list[SuccessorDocumentResponse] = Field(default_factory=list)

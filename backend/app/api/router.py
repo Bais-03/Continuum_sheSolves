@@ -7,6 +7,7 @@ from app.api.endpoints import (
     guardian,
     guardian_acceptance,
     guardian_portal,
+    assistant,
 )
 
 from app.api.endpoints.domain import (
@@ -33,3 +34,5 @@ api_router.include_router(graph.router)
 api_router.include_router(guardian.router)
 api_router.include_router(guardian_acceptance.router)
 api_router.include_router(guardian_portal.router)
+
+api_router.include_router(assistant.router)

@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { logoutUser, type ContinuumUser } from "@/lib/auth";
+import { ContinuumAssistant } from "@/components/assistant/ContinuumAssistant";
 
 const HOUSEHOLD_NAV = [
   { to: "/dashboard", label: "1 Dashboard" },
@@ -140,6 +141,7 @@ export function ProtectedShell({
         Prototype · synthetic data only · a checklist, not financial or legal
         advice
       </footer>
+      <ContinuumAssistant />
     </div>
   );
 }

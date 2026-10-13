@@ -68,6 +68,15 @@ class DimensionBreakdown(BaseModel):
     confirmed_count: int
     unconfirmed_count: int
     rejected_count: int
+
+    # Readiness evidence-integrity metrics
+    evidence_count: int = 0
+    target_slots: int = 1
+    coverage: float = 0.0
+    duplicate_count: int = 0
+    empty_value_count: int = 0
+
+    # Human-readable reasons for the dimension score
     explanations: List[str]
 
 class ReadinessResponse(BaseModel):

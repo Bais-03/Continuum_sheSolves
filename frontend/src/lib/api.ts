@@ -600,6 +600,20 @@ export async function apiGetPendingGuardianReleaseRequests(): Promise<
 
 
 /**
+ * Get all release requests assigned to the
+ * currently authenticated Guardian, including completed requests.
+ */
+export async function apiGetGuardianReleaseHistory(): Promise<
+  GuardianReleaseSummary[]
+> {
+  return apiRequest(
+    "/guardian/release-requests/history",
+  );
+}
+
+
+
+/**
  * Approve a release request as the authenticated Guardian.
  */
 export async function apiApproveGuardianReleaseRequest(
@@ -633,6 +647,32 @@ export async function apiRejectGuardianReleaseRequest(
       },
       body: JSON.stringify({}),
     },
+  );
+}
+
+export type SuccessorFieldResponse = {
+  field_label: string;
+  extracted_value: string;
+  readiness_dimension: string | null;
+};
+
+export type SuccessorDocumentResponse = {
+  filename: string;
+  document_type: string | null;
+  fields: SuccessorFieldResponse[];
+};
+
+export type SuccessorAccessResponse = {
+  release_request_id: string;
+  release_status: string;
+  documents: SuccessorDocumentResponse[];
+};
+
+export async function apiGetSuccessorData(
+  releaseRequestId: string,
+): Promise<SuccessorAccessResponse> {
+  return apiRequest(
+    `/guardian/release-requests/${releaseRequestId}/successor-data`,
   );
 }
 

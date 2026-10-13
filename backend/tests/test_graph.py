@@ -473,3 +473,91 @@ async def test_graph_analyze_uses_authenticated_household_owner(signed_up_client
     assert data["relationships"] == []
     assert any(gap["gap_type"] == "contact" for gap in data["gaps"])
 
+async def test_graph_service_detects_conflicts_across_household_documents(
+    signed_up_client,
+):
+    """Conflicting confirmed owner names produce a conflict gap and action."""
+
+    _, user_data = signed_up_client
+
+    from tests.conftest import TestSessionLocal
+    from app.models.household import Household
+
+    db = TestSessionLocal()
+
+    try:
+        documents = [
+            Document(
+                household_id=user_data["household_id"],
+                filename="insurance.txt",
+                document_type="text/plain",
+                storage_reference="test/insurance.txt",
+                upload_status="COMPLETED",
+            ),
+            Document(
+                household_id=user_data["household_id"],
+                filename="bank.txt",
+                document_type="text/plain",
+                storage_reference="test/bank.txt",
+                upload_status="COMPLETED",
+            ),
+        ]
+
+        db.add_all(documents)
+        db.commit()
+
+        for document in documents:
+            db.refresh(document)
+
+        fields = [
+            ExtractedField(
+                document_id=documents[0].id,
+                field_label="Policy Holder",
+                extracted_value="Raj Sharma",
+                confidence=1.0,
+                readiness_dimension="asset",
+                confirmation_status="CONFIRMED",
+            ),
+            ExtractedField(
+                document_id=documents[1].id,
+                field_label="Account Holder",
+                extracted_value="Ravi Sharma",
+                confidence=1.0,
+                readiness_dimension="asset",
+                confirmation_status="CONFIRMED",
+            ),
+        ]
+
+        db.add_all(fields)
+        db.commit()
+
+        household = (
+            db.query(Household)
+            .filter(Household.id == user_data["household_id"])
+            .first()
+        )
+
+        assert household is not None
+
+        result = GraphService().analyze_household(db, household)
+
+        conflicts = [
+            gap for gap in result.gaps
+            if gap.gap_type == "conflict"
+        ]
+
+        assert len(conflicts) == 1
+        assert conflicts[0].severity == GapSeverity.HIGH
+        assert "Raj Sharma" in conflicts[0].reason
+        assert "Ravi Sharma" in conflicts[0].reason
+
+        conflict_actions = [
+            action for action in result.actions
+            if action.gap_type == "conflict"
+        ]
+
+        assert len(conflict_actions) == 1
+        assert conflict_actions[0].priority == "high"
+
+    finally:
+        db.close()

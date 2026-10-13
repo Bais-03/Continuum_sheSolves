@@ -127,31 +127,38 @@ def get_household_release_requests(
     )
 
 
-def get_guardian_pending_requests(
-    db: Session,
-    guardian_id: str,
-) -> list[GuardianReleaseRequest]:
-    """
-    Return pending release requests assigned to a Guardian.
-    """
 
-    return (
+def get_guardian_pending_requests(db: Session, guardian_id: str) -> list[GuardianReleaseRequest]:
+    requests = (
         db.query(GuardianReleaseRequest)
         .join(
             GuardianReleaseApproval,
-            GuardianReleaseApproval.release_request_id
-            == GuardianReleaseRequest.id,
+            GuardianReleaseApproval.release_request_id == GuardianReleaseRequest.id,
         )
         .filter(
             GuardianReleaseApproval.guardian_id == guardian_id,
             GuardianReleaseApproval.status == "pending",
             GuardianReleaseRequest.status == "pending",
         )
-        .order_by(
-            GuardianReleaseRequest.created_at.desc()
-        )
+        .order_by(GuardianReleaseRequest.created_at.desc())
         .all()
     )
+
+    now = datetime.utcnow()
+    changed = False
+
+    for request in requests:
+        if request.expires_at is not None and request.expires_at <= now:
+            request.status = "expired"
+            changed = True
+
+    if changed:
+        db.commit()
+        for request in requests:
+            db.refresh(request)
+
+    return [request for request in requests if request.status == "pending"]
+
 
 
 def approve_release_request(
@@ -373,3 +380,45 @@ def count_approvals(
         "pending": pending,
         "threshold": THRESHOLD,
     }
+
+
+def get_guardian_release_requests(
+    db: Session,
+    guardian_id: str,
+) -> list[GuardianReleaseRequest]:
+    """Return all release requests assigned to a Guardian."""
+
+    requests = (
+        db.query(GuardianReleaseRequest)
+        .join(
+            GuardianReleaseApproval,
+            GuardianReleaseApproval.release_request_id
+            == GuardianReleaseRequest.id,
+        )
+        .filter(
+            GuardianReleaseApproval.guardian_id == guardian_id,
+        )
+        .order_by(
+            GuardianReleaseRequest.created_at.desc()
+        )
+        .all()
+    )
+
+    now = datetime.utcnow()
+    changed = False
+
+    for request in requests:
+        if (
+            request.status == "pending"
+            and request.expires_at is not None
+            and request.expires_at <= now
+        ):
+            request.status = "expired"
+            changed = True
+
+    if changed:
+        db.commit()
+        for request in requests:
+            db.refresh(request)
+
+    return requests

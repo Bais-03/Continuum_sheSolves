@@ -8,6 +8,7 @@ from app.api.deps import (
 )
 from app.db.session import get_db
 from app.models.guardian import Guardian
+from app.models.domain import Document, ExtractedField
 from app.models.guardian_release import GuardianReleaseApproval
 from app.models.household import Household
 from app.models.user import User
@@ -34,6 +35,9 @@ from app.schemas.guardian_release import (
     GuardianReleaseRejectionRequest,
     GuardianReleaseRequestResponse,
     GuardianReleaseSummaryResponse,
+    SuccessorAccessResponse,
+    SuccessorDocumentResponse,
+    SuccessorFieldResponse,
 )
 
 from app.services.guardian_invitation_service import (
@@ -55,6 +59,7 @@ from app.services.guardian_release_service import (
     count_approvals,
     create_release_request,
     get_guardian_pending_requests,
+    get_guardian_release_requests,
     get_household_release_requests,
     get_release_request,
     reject_release_request,
@@ -435,6 +440,57 @@ def _get_authenticated_guardian(
     return guardian
 
 
+
+@router.get(
+    "/release-requests/history",
+    response_model=list[GuardianReleaseSummaryResponse],
+)
+def get_guardian_release_request_history(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[GuardianReleaseSummaryResponse]:
+    """
+    Return all release requests assigned to the authenticated Guardian.
+    """
+
+    guardian = _get_authenticated_guardian(
+        db=db,
+        current_user=current_user,
+    )
+
+    requests = get_guardian_release_requests(
+        db=db,
+        guardian_id=guardian.id,
+    )
+
+    result: list[GuardianReleaseSummaryResponse] = []
+
+    for release_request in requests:
+        stats = count_approvals(
+            db=db,
+            release_request_id=release_request.id,
+        )
+
+        result.append(
+            GuardianReleaseSummaryResponse(
+                id=release_request.id,
+                status=release_request.status,
+                threshold=release_request.threshold,
+                approved_count=stats["approved"],
+                rejected_count=stats["rejected"],
+                pending_count=stats["pending"],
+                created_at=release_request.created_at,
+                expires_at=release_request.expires_at,
+            )
+        )
+
+    return result
+
+
+
+
+
+
 @router.get(
     "/release-requests/pending",
     response_model=list[GuardianReleaseSummaryResponse],
@@ -602,6 +658,114 @@ def get_guardian_release_request(
         expires_at=release_request.expires_at,
         released_at=release_request.released_at,
         approvals=approvals,
+    )
+
+
+@router.get(
+    "/release-requests/{release_request_id}/successor-data",
+    response_model=SuccessorAccessResponse,
+)
+def get_successor_data(
+    release_request_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> SuccessorAccessResponse:
+    """Return confirmed household information after an authorized release."""
+
+    guardian = _get_authenticated_guardian(
+        db=db,
+        current_user=current_user,
+    )
+
+    release_request = get_release_request(
+        db=db,
+        release_request_id=release_request_id,
+    )
+
+    if release_request is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Release request not found.",
+        )
+
+    if release_request.household_id != guardian.household_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This release request belongs to another household.",
+        )
+
+    approval = (
+        db.query(GuardianReleaseApproval)
+        .filter(
+            GuardianReleaseApproval.release_request_id == release_request.id,
+            GuardianReleaseApproval.guardian_id == guardian.id,
+        )
+        .first()
+    )
+
+
+    if approval is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not assigned to this release request.",
+        )
+
+    if approval.status != "approved":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only guardians who approved the release can access successor data.",
+        )
+
+    if release_request.status != "released" or release_request.released_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Successor data is available only after release approval.",
+        )
+
+    documents = (
+        db.query(Document)
+        .filter(Document.household_id == guardian.household_id)
+        .order_by(Document.created_at.asc(), Document.id.asc())
+        .all()
+    )
+
+    result_documents = []
+
+    for document in documents:
+        confirmed_fields = (
+            db.query(ExtractedField)
+            .filter(
+                ExtractedField.document_id == document.id,
+                ExtractedField.confirmation_status == "CONFIRMED",
+                ExtractedField.extracted_value.isnot(None),
+            )
+            .order_by(ExtractedField.field_label.asc(), ExtractedField.id.asc())
+            .all()
+        )
+
+        safe_fields = [
+            SuccessorFieldResponse(
+                field_label=field.field_label,
+                extracted_value=field.extracted_value,
+                readiness_dimension=field.readiness_dimension,
+            )
+            for field in confirmed_fields
+            if field.extracted_value.strip()
+        ]
+
+        if safe_fields:
+            result_documents.append(
+                SuccessorDocumentResponse(
+                    filename=document.filename,
+                    document_type=document.document_type,
+                    fields=safe_fields,
+                )
+            )
+
+    return SuccessorAccessResponse(
+        release_request_id=release_request.id,
+        release_status=release_request.status,
+        documents=result_documents,
     )
 
 

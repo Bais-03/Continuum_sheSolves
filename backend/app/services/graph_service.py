@@ -26,7 +26,8 @@ from sqlalchemy.orm import Session
 from app.dayzero.generator import DayZeroAction, DayZeroGenerator
 from app.graph.builder import GraphRelationship, KnowledgeGraphBuilder
 from app.graph.entities import GraphEntity
-from app.graph.gap_detector import GapDetector, GraphGap
+from app.graph.gap_detector import GapDetector, GapSeverity, GraphGap
+from app.services.conflict_detector import ConflictDetector
 from app.graph.normalizer import GraphFieldNormalizer
 from app.models.domain import Document
 from app.models.household import Household
@@ -53,6 +54,7 @@ class GraphService:
         self.normalizer = GraphFieldNormalizer()
         self.builder = KnowledgeGraphBuilder()
         self.dayzero_generator = DayZeroGenerator()
+        self.conflict_detector = ConflictDetector()
 
     def analyze(
         self,
@@ -104,10 +106,8 @@ class GraphService:
         household: Household,
     ) -> GraphAnalysisResult:
         """
-        Build the knowledge graph from the household's
-        existing confirmed extracted fields.
-
-        No new database records are created.
+        Build the graph from confirmed household fields and detect
+        conflicts across the household's source documents.
         """
 
         documents = (
@@ -117,34 +117,46 @@ class GraphService:
         )
 
         fields: list[dict] = []
+        conflict_documents: list[dict] = []
 
         for document in documents:
-            for field in document.fields:
-                fields.append(
-                    {
-                        "field_label": field.field_label,
-                        "extracted_value": field.extracted_value,
-                        "confirmation_status": field.confirmation_status,
-                    }
-                )
+            document_fields: list[dict] = []
 
-        # The authenticated household owner is the canonical primary
-        # person for the graph. Only add this fact when the confirmed
-        # documents do not already contain an explicit owner field.
-        # This keeps user identity server-side and prevents the frontend
-        # from inventing the holder relationship.
+            for field in document.fields:
+                field_data = {
+                    "field_label": field.field_label,
+                    "extracted_value": field.extracted_value,
+                    "confirmation_status": field.confirmation_status,
+                }
+
+                fields.append(field_data)
+                document_fields.append(field_data)
+
+            conflict_documents.append(
+                {
+                    "id": str(document.id),
+                    "filename": document.filename,
+                    "fields": document_fields,
+                }
+            )
+
+        # Add the authenticated household owner as a graph fact only
+        # when no confirmed owner field exists in the documents.
         has_confirmed_owner = any(
-            field.get("confirmation_status") == "CONFIRMED"
+            str(field.get("confirmation_status", "")).upper() == "CONFIRMED"
             and str(field.get("field_label", "")).strip().lower()
             in {
                 "owner",
                 "owner name",
+                "primary owner",
                 "policy holder",
                 "policyholder",
                 "account holder",
                 "account owner",
+                "property owner",
+                "borrower",
             }
-            and str(field.get("extracted_value", "")).strip()
+            and str(field.get("extracted_value") or "").strip()
             for field in fields
         )
 
@@ -157,4 +169,34 @@ class GraphService:
                 }
             )
 
-        return self.analyze_fields(fields)
+        # Preserve the existing graph and beneficiary/contact analysis.
+        result = self.analyze_fields(fields)
+
+        # Detect disagreements using original document boundaries.
+        conflicts = self.conflict_detector.detect(conflict_documents)
+
+        conflict_gaps = [
+            GraphGap(
+                gap_type="conflict",
+                entity_id=conflict.conflict_id,
+                title=(
+                    "Resolve conflicting "
+                    f"{conflict.field_label.replace('_', ' ')}"
+                ),
+                reason=conflict.reason,
+                severity=GapSeverity.HIGH,
+            )
+            for conflict in conflicts
+        ]
+
+        combined_gaps = [*result.gaps, *conflict_gaps]
+
+        # Generate actions from the combined gaps so task synchronization
+        # receives exactly the actions corresponding to this analysis.
+        combined_actions = self.dayzero_generator.generate(combined_gaps)
+
+        return GraphAnalysisResult(
+            graph=result.graph,
+            gaps=combined_gaps,
+            actions=combined_actions,
+        )
